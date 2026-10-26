@@ -1,4 +1,11 @@
 {
   "cleanUrls": true,
-  "functions": { "api/*.js": { "maxDuration": 60 } }
+  "rewrites": [{ "source": "/i/:id", "destination": "/i.html" }],
+  "functions": {
+    "api/create.js": { "maxDuration": 300 },
+    "api/turn.js": { "maxDuration": 60 },
+    "api/finish.js": { "maxDuration": 120 },
+    "api/speak.js": { "maxDuration": 30 },
+    "api/plan.js": { "maxDuration": 10 }
+  }
 }

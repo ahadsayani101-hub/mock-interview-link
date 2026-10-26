@@ -18,7 +18,7 @@ http
         return res.end("Not found");
       }
     }
-    let path = url.pathname === "/" ? "/index.html" : url.pathname;
+    let path = url.pathname === "/" ? "/index.html" : url.pathname.startsWith("/i/") ? "/i.html" : url.pathname;
     if (!extname(path)) path += ".html";
     try {
       const body = await readFile(join("public", normalize(path).replace(/^(\.\.[/\\])+/, "")));

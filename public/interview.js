@@ -1,7 +1,15 @@
 import { decodePlan, post } from "/share.js";
 
 const $ = (id) => document.getElementById(id);
-const show = (id) => ["welcome", "interview", "done"].forEach((s) => $(s).classList.toggle("hidden", s !== id));
+const show = (id) => ["welcome", "interview", "done"].forEach((s) => ($(s).hidden = s !== id));
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const CLOSING = "That's the end of the interview. Thanks so much. I'm putting together your scorecard now.";
+
+const ICON = {
+  mic: '<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 17v4"/></svg>',
+  stop: '<svg class="i" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2.5" fill="currentColor"/></svg>',
+  mail: '<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>',
+};
 
 let plan;
 const transcript = []; // [{ exchanges: [{ q, a }] }] per question
@@ -10,15 +18,81 @@ const transcript = []; // [{ exchanges: [{ q, a }] }] per question
 let voice;
 function pickVoice() {
   const vs = speechSynthesis.getVoices().filter((v) => v.lang?.startsWith("en"));
-  const pref = ["Samantha", "Google US English", "Microsoft Aria", "Karen", "Daniel", "Alex"];
-  voice = pref.map((n) => vs.find((v) => v.name.includes(n))).find(Boolean) || vs.find((v) => v.default) || vs[0];
+  // Prefer the higher-quality voices some devices ship with.
+  const pref = ["(Natural)", "(Premium)", "(Enhanced)", "Samantha", "Google US English", "Microsoft Aria", "Karen", "Daniel"];
+  voice =
+    pref.map((n) => vs.find((v) => v.name.includes(n) && v.lang === "en-US") || vs.find((v) => v.name.includes(n))).find(Boolean) ||
+    vs.find((v) => v.default) ||
+    vs[0];
 }
 if ("speechSynthesis" in window) {
   pickVoice();
   speechSynthesis.onvoiceschanged = pickVoice;
 }
 
-function speak(text) {
+// Natural voice from the server (/api/speak). If the server has no voice key, fall back to the
+// browser's built-in voice for the rest of the session.
+let cloudVoice = true;
+const player = new Audio();
+const audioCache = new Map();
+
+function fetchAudio(text) {
+  if (!cloudVoice || !text) return Promise.resolve(null);
+  if (!audioCache.has(text)) {
+    const p = fetch("/api/speak", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+    })
+      .then(async (r) => {
+        if (r.status === 501) cloudVoice = false;
+        return r.ok ? URL.createObjectURL(await r.blob()) : null;
+      })
+      .catch(() => null);
+    audioCache.set(text, p);
+  }
+  return audioCache.get(text);
+}
+
+// iOS only lets a page play audio after a tap; play a blank clip inside the Start tap.
+function unlockAudio() {
+  const rate = 8000, n = 800;
+  const buf = new DataView(new ArrayBuffer(44 + n * 2));
+  const str = (o, s) => [...s].forEach((c, i) => buf.setUint8(o + i, c.charCodeAt(0)));
+  str(0, "RIFF"); buf.setUint32(4, 36 + n * 2, true); str(8, "WAVEfmt ");
+  buf.setUint32(16, 16, true); buf.setUint16(20, 1, true); buf.setUint16(22, 1, true);
+  buf.setUint32(24, rate, true); buf.setUint32(28, rate * 2, true); buf.setUint16(32, 2, true);
+  buf.setUint16(34, 16, true); str(36, "data"); buf.setUint32(40, n * 2, true);
+  player.src = URL.createObjectURL(new Blob([buf], { type: "audio/wav" }));
+  player.play().catch(() => {});
+  if ("speechSynthesis" in window) speechSynthesis.speak(new SpeechSynthesisUtterance(""));
+}
+
+function playUrl(url) {
+  return new Promise((resolve) => {
+    let timer;
+    const done = (ok) => {
+      clearTimeout(timer);
+      player.onended = player.onerror = null;
+      resolve(ok);
+    };
+    player.onended = () => done(true);
+    player.onerror = () => done(false);
+    player.onloadedmetadata = () => {
+      if (isFinite(player.duration)) timer = setTimeout(() => done(true), (player.duration + 2) * 1000);
+    };
+    player.src = url;
+    player.play().catch(() => done(false));
+  });
+}
+
+async function speak(text) {
+  const url = await fetchAudio(text);
+  if (url && (await playUrl(url))) return;
+  return browserSpeak(text);
+}
+
+function browserSpeak(text) {
   return new Promise((resolve) => {
     if (!("speechSynthesis" in window) || !text) return resolve();
     speechSynthesis.cancel();
@@ -50,9 +124,11 @@ function startRecording() {
   live = "";
   render();
   recording = true;
-  $("mic").classList.add("recording");
-  $("mic").textContent = "■";
-  $("status").textContent = "Listening. Tap when you're done.";
+  setState("listening");
+  $("mic").classList.add("rec");
+  $("mic").innerHTML = ICON.stop;
+  $("mic-label").textContent = "Done";
+  $("status").textContent = "Listening";
   listen();
 }
 
@@ -64,12 +140,17 @@ function listen() {
   rec.onresult = (e) => {
     live = Array.from(e.results, (r) => r[0].transcript).join(" ");
     render();
+    // Small pulse on the orb so the speaker can see they're being heard.
+    $("orb").classList.add("blip");
+    setTimeout(() => $("orb").classList.remove("blip"), 120);
   };
   rec.onerror = (e) => {
     if (e.error === "not-allowed" || e.error === "service-not-allowed") {
       recording = false;
+      resetMic();
       setTyping(true);
-      $("status").textContent = "Microphone access was blocked, so type your answer instead.";
+      setState("idle");
+      $("status").textContent = "Microphone is blocked, so type your answer instead.";
     }
   };
   // Mobile browsers stop listening after a pause; keep going until the user taps done.
@@ -83,128 +164,229 @@ function listen() {
   rec.start();
 }
 
+function resetMic() {
+  $("mic").classList.remove("rec");
+  $("mic").innerHTML = ICON.mic;
+  $("mic-label").textContent = "Answer";
+}
+
 function stopRecording() {
   return new Promise((resolve) => {
     recording = false;
-    $("mic").classList.remove("recording");
-    $("mic").textContent = "🎤";
+    resetMic();
     if (!rec) return resolve((committed + " " + live).trim());
-    const r = rec;
     const finish = () => resolve((committed + " " + live).trim());
-    r.onend = () => {
+    rec.onend = () => {
       committed = (committed + " " + live).trim();
       live = "";
       finish();
     };
     setTimeout(finish, 1500);
-    r.stop();
+    rec.stop();
   });
 }
 
 function setTyping(on) {
   typing = on;
-  $("typed").classList.toggle("hidden", !on);
-  $("submit-typed").classList.toggle("hidden", !on);
-  $("mic").classList.toggle("hidden", on);
-  $("answer").classList.toggle("hidden", on);
-  $("toggle-type").textContent = on ? "Answer by voice" : "Type instead";
-  $("toggle-type").classList.toggle("hidden", !Recognition);
+  $("typed").hidden = !on;
+  $("submit-typed").hidden = !on;
+  $("mic-ctl").style.visibility = on ? "hidden" : "visible";
+  $("answer").hidden = on;
+  $("toggle-label").textContent = on ? "Voice" : "Type";
+  $("toggle-type").parentElement.style.visibility = Recognition ? "visible" : "hidden";
+  if (on) setTimeout(() => $("typed").focus(), 50);
 }
 
 // ---------- Interview flow ----------
 let qIndex = 0;
-let current; // { q } waiting for an answer
+let current;
 let answerResolve;
+
+const setState = (s) => ($("interview").dataset.state = s);
 
 function waitForAnswer() {
   return new Promise((resolve) => (answerResolve = resolve));
 }
 
-function setBusy(msg) {
-  $("status").innerHTML = msg ? `${msg}<span class="dots"></span>` : "";
-  $("mic").disabled = Boolean(msg);
-  $("submit-typed").disabled = Boolean(msg);
+function lock(locked, status) {
+  $("mic").disabled = locked;
+  $("submit-typed").disabled = locked;
+  $("repeat").disabled = locked;
+  $("status").textContent = status || "";
 }
 
 async function ask(text, label) {
   current = text;
-  $("q-text").textContent = text;
   $("q-label").textContent = label;
+  $("q-text").textContent = text;
   $("answer").textContent = "";
   $("typed").value = "";
-  setBusy("Interviewer speaking");
+  setState("speaking");
+  lock(true, "");
   await speak(text);
-  setBusy("");
-  $("status").textContent = typing ? "Type your answer, then submit." : "Tap the mic to answer.";
+  setState("idle");
+  lock(false, typing ? "Type your answer, then submit" : "Tap the mic when you're ready");
   return waitForAnswer();
 }
 
 function renderProgress() {
-  $("progress").innerHTML = plan.questions.map((_, i) => `<span class="${i < qIndex ? "done" : ""}"></span>`).join("");
+  const n = plan.questions.length;
+  $("progress").innerHTML = plan.questions
+    .map((_, i) => `<span class="${i < qIndex ? "done" : i === qIndex ? "now" : ""}"></span>`)
+    .join("");
+  $("counter").textContent = `${Math.min(qIndex + 1, n)}/${n}`;
 }
 
 async function run() {
   show("interview");
+  $("mic").innerHTML = ICON.mic;
   setTyping(typing);
   const name = $("name").value.trim();
-  await speak(`Hi${name ? " " + name : ""}, thanks for coming in. Let's get started.`);
+  qIndex = 0;
+  renderProgress();
+  $("q-label").textContent = "";
+  $("q-text").textContent = `Hi${name ? " " + name : ""}, let's get started.`;
+  setState("speaking");
+  lock(true);
+  const greeting = `Hi${name ? " " + name : ""}, thanks for coming in. Let's get started.`;
+  fetchAudio(greeting);
+  // Fetch every main question's audio now so there's no pause before each one.
+  plan.questions.forEach((q) => fetchAudio(q.ask));
+  fetchAudio(CLOSING);
+  await speak(greeting);
+
   for (qIndex = 0; qIndex < plan.questions.length; qIndex++) {
     renderProgress();
-    const label = `Question ${qIndex + 1} of ${plan.questions.length}`;
     const entry = { exchanges: [] };
     transcript.push(entry);
     let q = plan.questions[qIndex].ask;
-    let isFollowUp = false;
+    let followUp = false;
     while (true) {
-      const a = await ask(q, isFollowUp ? `${label} · follow-up` : label);
+      const a = await ask(q, followUp ? "Follow-up" : plan.questions[qIndex].why);
       entry.exchanges.push({ q, a });
-      setBusy("Thinking");
+      setState("thinking");
+      lock(true, "");
       let t;
       try {
         t = await post("/api/turn", { plan, index: qIndex, exchanges: entry.exchanges });
       } catch {
         t = { action: "next", say: "Thanks." };
       }
-      setBusy("");
       if (t.action === "followup" && t.say) {
         q = t.say;
-        isFollowUp = true;
+        followUp = true;
         continue;
       }
       if (t.say) {
+        $("q-label").textContent = "";
         $("q-text").textContent = t.say;
-        setBusy("Interviewer speaking");
+        $("answer").textContent = "";
+        setState("speaking");
         await speak(t.say);
       }
       break;
     }
   }
-  qIndex = plan.questions.length;
-  renderProgress();
-  speak("That's the end of the interview. I'm putting together your scorecard now.");
+  speak(CLOSING);
   finish();
 }
 
+// ---------- Results ----------
 async function finish() {
   show("done");
-  $("retry").classList.add("hidden");
-  $("d-err").textContent = "";
-  $("d-title").innerHTML = 'Scoring your answers<span class="dots"></span>';
+  window.scrollTo(0, 0);
+  $("d-loading").hidden = false;
+  $("d-error").hidden = true;
+  $("d-result").hidden = true;
   try {
-    const r = await post("/api/finish", { plan, transcript, name: $("name").value.trim(), email: $("email").value.trim() });
-    $("d-title").textContent = `You scored ${r.card.overall}/10`;
-    $("d-mail").textContent = r.mail.sent
-      ? `We emailed this scorecard to ${$("email").value.trim()}.`
-      : `We couldn't email it (${r.mail.reason}). Screenshot it below to keep it.`;
-    const f = $("scorecard");
-    f.srcdoc = r.html;
-    f.classList.remove("hidden");
-    f.onload = () => (f.style.height = f.contentDocument.body.scrollHeight + 40 + "px");
+    const email = $("email").value.trim();
+    const r = await post("/api/finish", { plan, transcript, name: $("name").value.trim(), email });
+    renderResults(r.card, r.mail, email, r.baseline || []);
   } catch (e) {
-    $("d-title").textContent = "Scoring hit a snag";
+    $("d-loading").hidden = true;
+    $("d-error").hidden = false;
     $("d-err").textContent = e.message;
-    $("retry").classList.remove("hidden");
   }
+}
+
+function el(tag, cls, text) {
+  const n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (text != null) n.textContent = text;
+  return n;
+}
+
+function criteria(list, scores) {
+  return list.map((c, i) => {
+    const s = scores[i] || {};
+    const box = el("div", "crit");
+    const head = el("div", "head");
+    head.append(el("b", null, c.name), scoreDots(s.score));
+    box.append(head);
+    if (s.comment) box.append(el("p", "comment", s.comment));
+    if (s.evidence) box.append(el("p", "evidence", `“${s.evidence}”`));
+    return box;
+  });
+}
+
+function scoreDots(score = 0) {
+  const dots = el("span", "dots");
+  dots.setAttribute("aria-label", `${score} out of 5`);
+  for (let k = 1; k <= 5; k++) dots.append(el("i", k <= score ? "on" : ""));
+  return dots;
+}
+
+function renderResults(card, mail, email, baseline) {
+  $("d-loading").hidden = true;
+  $("d-result").hidden = false;
+  $("d-role").textContent = plan.role + (plan.company ? ` · ${plan.company}` : "");
+  $("d-headline").textContent = card.headline;
+  $("d-summary").textContent = card.summary;
+
+  const arc = $("d-arc");
+  const c = 2 * Math.PI * 44;
+  arc.style.strokeDasharray = c;
+  arc.style.strokeDashoffset = c;
+  requestAnimationFrame(() => requestAnimationFrame(() => (arc.style.strokeDashoffset = c * (1 - card.overall / 10))));
+  // Count up to the score, ending on the exact value (it can have one decimal).
+  const start = performance.now();
+  const step = (now) => {
+    const t = Math.min(1, (now - start) / 1100);
+    const v = card.overall * (1 - Math.pow(1 - t, 3));
+    $("d-score").textContent = t < 1 ? Math.round(v) : String(card.overall);
+    if (t < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+
+  $("d-role-rubric").replaceChildren(...criteria(plan.rubric || [], card.role || []));
+  $("d-baseline").replaceChildren(...criteria(baseline, card.baseline || []));
+
+  $("d-mail").innerHTML = ICON.mail;
+  $("d-mail").append(
+    el("span", null, mail.sent ? `A copy is on its way to ${email}.` : `Not emailed: ${mail.reason} Screenshot this page to keep it.`)
+  );
+
+  const list = $("d-qs");
+  list.innerHTML = "";
+  plan.questions.forEach((q, i) => {
+    const s = card.questions[i] || {};
+    const box = el("div", "qcard");
+    const head = el("div", "head");
+    head.append(el("span", "tag", `Q${i + 1} · ${q.why}`));
+    head.append(scoreDots(s.score));
+    box.append(head, el("p", "q", q.ask));
+    box.append(s.quote ? el("blockquote", "quote", `“${s.quote}”`) : el("p", "muted", "No answer recorded."));
+    for (const [k, v] of [["Worked", s.strength], ["Improve", s.improve]]) {
+      if (!v) continue;
+      const row = el("p", "note");
+      row.append(el("b", null, k), el("span", null, v));
+      box.append(row);
+    }
+    list.append(box);
+  });
+
+  $("d-next").innerHTML = "";
+  (card.next_steps || []).forEach((s) => $("d-next").append(el("li", null, s)));
 }
 
 // ---------- Wire up ----------
@@ -218,7 +400,8 @@ $("mic").onclick = async () => {
     }
     return;
   }
-  setBusy("Wrapping up your answer");
+  setState("thinking");
+  lock(true, "");
   const a = await stopRecording();
   answerResolve?.(a);
 };
@@ -229,32 +412,47 @@ $("submit-typed").onclick = () => {
 };
 $("toggle-type").onclick = async () => {
   if (recording) {
-    const partial = await stopRecording();
-    $("typed").value = partial;
+    $("typed").value = await stopRecording();
+    setState("idle");
   }
   setTyping(!typing);
-  $("status").textContent = typing ? "Type your answer, then submit." : "Tap the mic to answer.";
+  if (!$("mic").disabled) $("status").textContent = typing ? "Type your answer, then submit" : "Tap the mic when you're ready";
 };
-$("repeat").onclick = () => {
-  if (!recording && current) speak(current);
+$("repeat").onclick = async () => {
+  if (recording || !current) return;
+  setState("speaking");
+  lock(true, "");
+  await speak(current);
+  setState("idle");
+  lock(false, typing ? "Type your answer, then submit" : "Tap the mic when you're ready");
 };
 $("retry").onclick = finish;
 
 $("start").onclick = () => {
   const email = $("email").value.trim();
-  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+  if (email && !EMAIL_RE.test(email)) {
     $("w-err").textContent = "That email doesn't look right.";
     return;
   }
   $("w-err").textContent = "";
-  // Unlock speech on iOS: it must start inside a tap.
-  if ("speechSynthesis" in window) speechSynthesis.speak(new SpeechSynthesisUtterance(""));
+  unlockAudio();
   run();
 };
 
+function renderPrep() {
+  const p = plan.prep;
+  if (!p) return;
+  $("prep").hidden = false;
+  $("p-about").textContent = p.about;
+  $("p-looks").replaceChildren(...(p.looks_for || []).map((t) => el("li", null, t)));
+  $("p-prepare").replaceChildren(...(p.prepare || []).map((t) => el("li", null, t)));
+  $("p-tips").replaceChildren(...(p.tips || []).map((t) => el("li", null, t)));
+  $("p-rubric").replaceChildren(...(plan.rubric || []).map((c) => el("span", "chip", c.name)));
+}
+
 async function load() {
   try {
-    const id = new URLSearchParams(location.search).get("id");
+    const id = location.pathname.match(/^\/i\/([a-z0-9-]+)/)?.[1] || new URLSearchParams(location.search).get("id");
     if (id) {
       const r = await fetch(`/api/plan?id=${encodeURIComponent(id)}`);
       const data = await r.json();
@@ -266,12 +464,14 @@ async function load() {
     if (!plan?.questions?.length) throw new Error("This link is missing its interview.");
   } catch (e) {
     $("w-title").textContent = "This link doesn't work";
-    $("w-sub").textContent = e.message || "Ask whoever sent it for a fresh link.";
+    $("w-meta").replaceChildren(el("span", "muted", e.message || "Ask whoever sent it for a fresh link."));
     return;
   }
-  document.title = `Mock interview: ${plan.role}`;
-  $("w-title").textContent = plan.role + (plan.company ? ` at ${plan.company}` : "");
-  $("w-sub").textContent = `${plan.questions.length} questions, about ${plan.questions.length * 2} minutes.`;
+  document.title = `Mock interview: ${plan.role}${plan.company ? ` at ${plan.company}` : ""}`;
+  $("w-title").textContent = plan.role;
+  const chips = [plan.company, `${plan.questions.length} questions`, `About ${plan.questions.length * 2} min`, "Voice"].filter(Boolean);
+  $("w-meta").replaceChildren(...chips.map((c) => el("span", "chip", c)));
+  renderPrep();
   $("start").disabled = false;
   if (!Recognition)
     $("w-note").textContent = "This browser can't transcribe speech, so you'll type your answers. For voice, use Safari on iPhone or Chrome on Android.";

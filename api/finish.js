@@ -1,6 +1,7 @@
 import { route, bad } from "../lib/http.js";
 import { scoreInterview } from "../lib/claude.js";
 import { scorecardHtml, sendScorecard } from "../lib/email.js";
+import { BASELINE } from "../lib/rubric.js";
 
 export default route(async ({ plan, transcript, name, email }) => {
   if (!plan?.questions || !Array.isArray(transcript)) throw bad("Bad request");
@@ -17,5 +18,5 @@ export default route(async ({ plan, transcript, name, email }) => {
       mail = { sent: false, reason: err.message };
     }
   }
-  return { card, html, mail };
+  return { card, html, mail, baseline: BASELINE };
 });

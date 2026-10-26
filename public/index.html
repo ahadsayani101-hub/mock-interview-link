@@ -3,97 +3,234 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Mock Interview Link</title>
+  <title>Mock Interview</title>
   <meta name="description" content="Paste a job posting, share a link, and get interviewed out loud on your phone." />
+  <meta name="theme-color" content="#fafaf9" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#0a0a0b" media="(prefers-color-scheme: dark)" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
-<main>
-  <div class="eyebrow">Mock Interview Link</div>
-  <h1>Turn any job posting into a spoken mock interview</h1>
-  <p class="muted">Paste the posting, get a link. Whoever opens it on their phone gets interviewed out loud with questions from this posting, plus follow-ups, then gets a scorecard by email.</p>
+<main class="wrap">
+  <header class="top">
+    <a class="brand" href="/"><span class="mark"></span>Mock Interview</a>
+  </header>
 
-  <section id="create" class="card">
-    <label for="posting">Job posting</label>
-    <textarea id="posting" placeholder="Paste the full job description here: title, responsibilities, requirements..."></textarea>
-    <label for="count">Number of questions</label>
-    <select id="count">
-      <option value="3">3 questions (about 5 minutes)</option>
-      <option value="5" selected>5 questions (about 10 minutes)</option>
-      <option value="7">7 questions (about 15 minutes)</option>
-    </select>
+  <section id="create" class="fade-in">
+    <h1>Practice the interview before the interview.</h1>
+    <p class="lede">Add the company, position and job description to get a short link. Whoever opens it on their phone is interviewed out loud, gets follow-ups, and receives a scorecard graded against a rubric built for that exact role.</p>
+
+    <div class="two">
+      <label class="input"><span>Company</span><input id="company" placeholder="Stripe" autocomplete="organization" /></label>
+      <label class="input"><span>Position</span><input id="position" placeholder="Software Engineering Intern" /></label>
+    </div>
+    <div class="input"><span>Job description</span></div>
+    <div class="field">
+      <textarea id="posting" placeholder="Paste the full job description" aria-label="Job description"></textarea>
+      <div class="field-foot">
+        <span id="chars">Responsibilities, requirements, nice-to-haves</span>
+        <button class="paste" id="paste" type="button" hidden>Paste</button>
+      </div>
+    </div>
+
+    <div class="row-between">
+      <span class="label">Questions</span>
+      <div class="seg" role="radiogroup" aria-label="Number of questions">
+        <button type="button" role="radio" aria-checked="false" data-v="3">3</button>
+        <button type="button" role="radio" aria-checked="true" data-v="5">5</button>
+        <button type="button" role="radio" aria-checked="false" data-v="7">7</button>
+      </div>
+    </div>
+
+    <button class="primary" id="go">
+      Create interview
+      <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+    </button>
+    <p class="loading-note" id="note"></p>
     <p class="error" id="err"></p>
-    <button id="go">Create interview link</button>
   </section>
 
-  <section id="result" class="card hidden">
-    <div class="eyebrow" id="r-demo"></div>
+  <section id="result" class="fade-in" hidden>
+    <span class="pill" id="r-pill">Ready to share</span>
     <h2 id="r-title"></h2>
-    <p class="muted small">Scan or share this link. It works in any phone browser, no app needed.</p>
-    <div id="qr"></div>
-    <div class="share-url" id="url"></div>
-    <div class="row" style="margin-top:12px">
-      <button id="copy">Copy link</button>
-      <button id="open" class="secondary">Open it</button>
+    <p class="muted" id="r-meta" style="margin:0"></p>
+
+    <button class="link-box" id="link-box" aria-label="Copy link">
+      <span id="short"></span>
+      <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+    </button>
+
+    <div class="actions">
+      <button class="primary" id="copy">
+        <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7M16 6l-4-4-4 4M12 2v13"/></svg>
+        <span>Share link</span>
+      </button>
+      <button class="ghost" id="open">
+        Try it
+        <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M8 7h9v9"/></svg>
+      </button>
     </div>
-    <details style="margin-top:16px">
-      <summary class="muted">Preview the questions</summary>
-      <ol class="qlist" id="qs"></ol>
+
+    <div class="qr-tile">
+      <div id="qr"></div>
+      <p>Or scan with a phone camera</p>
+    </div>
+
+    <h3>How it's graded</h3>
+    <p class="muted small-p" id="rubric-note"></p>
+    <ul class="rubric" id="rubric"></ul>
+    <details class="baseline">
+      <summary>Plus the baseline every interview gets</summary>
+      <ul class="rubric" id="baseline"></ul>
     </details>
-    <button class="link" id="again">Make another</button>
+    <div id="sources-wrap" hidden>
+      <h3>Research sources</h3>
+      <ul class="sources" id="sources"></ul>
+    </div>
+
+    <h3>Questions</h3>
+    <ol class="qlist" id="qs"></ol>
+
+    <button class="text-btn" id="again">← New posting</button>
   </section>
 </main>
+
 <script type="module">
   import { encodePlan, post } from "/share.js";
   import qrcode from "/vendor/qrcode.js";
   const $ = (id) => document.getElementById(id);
 
+  // Question count toggle
+  let count = 5;
+  document.querySelectorAll(".seg button").forEach((b) => {
+    b.onclick = () => {
+      document.querySelectorAll(".seg button").forEach((x) => x.setAttribute("aria-checked", x === b));
+      count = Number(b.dataset.v);
+    };
+  });
+
+  // Paste-from-clipboard shortcut where the browser allows it
+  if (navigator.clipboard?.readText) {
+    $("paste").hidden = false;
+    $("paste").onclick = async () => {
+      try {
+        $("posting").value = await navigator.clipboard.readText();
+        $("posting").dispatchEvent(new Event("input"));
+      } catch {}
+    };
+  }
+  $("posting").oninput = () => {
+    const n = $("posting").value.trim().split(/\s+/).filter(Boolean).length;
+    $("chars").textContent = n ? `${n} words` : "Responsibilities, requirements, nice-to-haves";
+  };
+
+  let steps = [];
+  let timer;
+  function loading(on) {
+    $("go").disabled = on;
+    $("go").innerHTML = on
+      ? '<span class="spinner"></span>'
+      : 'Create interview <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
+    clearInterval(timer);
+    $("note").textContent = on ? steps[0] : "";
+    let i = 0;
+    if (on) timer = setInterval(() => ($("note").textContent = steps[Math.min(++i, steps.length - 1)]), 10000);
+  }
+
   $("go").onclick = async () => {
     $("err").textContent = "";
-    $("go").disabled = true;
-    $("go").innerHTML = 'Reading the posting<span class="dots"></span>';
+    const company = $("company").value.trim();
+    steps = [`Researching ${company || "the company"}`, "Reading the job description", "Building the grading rubric", "Writing your questions", "Writing the prep sheet", "Still working. Deep research can take a couple of minutes"];
+    loading(true);
     try {
-      const { plan, id } = await post("/api/create", { posting: $("posting").value, count: $("count").value });
-      const url = id ? `${location.origin}/i?id=${id}` : `${location.origin}/i#${encodePlan(plan)}`;
-      $("r-title").textContent = plan.role + (plan.company ? ` · ${plan.company}` : "");
-      $("r-demo").textContent = plan.demo ? "Demo mode: no API key on the server yet" : "Your interview is ready";
-      $("url").textContent = url;
+      const { plan, id, baseline } = await post("/api/create", {
+        company,
+        position: $("position").value,
+        posting: $("posting").value,
+        count,
+      });
+      const url = id ? `${location.origin}/i/${id}` : `${location.origin}/i#${encodePlan(plan)}`;
+
+      $("r-pill").textContent = plan.demo ? "Demo mode" : "Ready to share";
+      $("r-title").textContent = plan.role;
+      $("r-meta").textContent = [plan.company, `${plan.questions.length} questions`, `about ${plan.questions.length * 2} min`].filter(Boolean).join(" · ");
+      $("short").textContent = id ? url.replace(/^https?:\/\//, "") : "Long link (short links need setup)";
+
+      const crit = (c) => {
+        const li = document.createElement("li");
+        li.innerHTML = "<b></b><span></span><em></em>";
+        li.children[0].textContent = c.name;
+        li.children[1].textContent = c.strong;
+        li.children[2].textContent = c.source || "";
+        return li;
+      };
+      $("rubric-note").textContent = plan.research
+        ? `Built from the job description and a web search on ${plan.company}.`
+        : "Built from the job description.";
+      $("rubric").replaceChildren(...plan.rubric.map(crit));
+      $("baseline").replaceChildren(...(baseline || []).map(crit));
+      $("sources-wrap").hidden = !plan.sources?.length;
+      $("sources").replaceChildren(
+        ...(plan.sources || []).map((src) => {
+          const li = document.createElement("li");
+          const a = document.createElement("a");
+          a.href = src.url;
+          a.target = "_blank";
+          a.rel = "noopener";
+          a.textContent = src.title;
+          li.append(a, Object.assign(document.createElement("span"), { textContent: new URL(src.url).hostname.replace(/^www\./, "") }));
+          return li;
+        })
+      );
+
       $("qs").innerHTML = "";
       plan.questions.forEach((q) => {
         const li = document.createElement("li");
-        li.innerHTML = `<div></div><div class="why"></div>`;
+        li.innerHTML = '<span class="q"></span><span class="why"></span>';
         li.children[0].textContent = q.ask;
-        li.children[1].textContent = `Tests: ${q.why}`;
+        li.children[1].textContent = q.why;
         $("qs").append(li);
       });
+
       try {
         const qr = qrcode(0, "L");
         qr.addData(url);
         qr.make();
         $("qr").innerHTML = qr.createSvgTag({ cellSize: 4, margin: 4, scalable: true });
       } catch {
-        $("qr").innerHTML = '<p class="muted small">This link is too long for a QR code. Connect a database for short links (see README).</p>';
+        $("qr").innerHTML = '<p class="muted">This link is too long for a QR code. Connect a database for short links (see README).</p>';
       }
-      $("copy").textContent = navigator.share ? "Share link" : "Copy link";
-      $("open").onclick = () => window.open(url, "_blank");
-      $("copy").onclick = async () => {
-        if (navigator.share) return navigator.share({ title: "Mock interview", url }).catch(() => {});
+
+      const label = $("copy").querySelector("span");
+      label.textContent = navigator.share ? "Share link" : "Copy link";
+      const copy = async () => {
         await navigator.clipboard.writeText(url);
-        $("copy").textContent = "Copied!";
-        setTimeout(() => ($("copy").textContent = "Copy link"), 1500);
+        label.textContent = "Copied";
+        setTimeout(() => (label.textContent = navigator.share ? "Share link" : "Copy link"), 1500);
       };
-      $("create").classList.add("hidden");
-      $("result").classList.remove("hidden");
+      $("copy").onclick = () =>
+        navigator.share
+          ? navigator.share({ title: `Mock interview: ${plan.role} at ${plan.company}`, url }).catch(() => {})
+          : copy();
+      $("link-box").onclick = copy;
+      $("open").onclick = () => window.open(url, "_blank");
+
+      $("create").hidden = true;
+      $("result").hidden = false;
+      window.scrollTo(0, 0);
     } catch (e) {
       $("err").textContent = e.message;
     } finally {
-      $("go").disabled = false;
-      $("go").textContent = "Create interview link";
+      loading(false);
     }
   };
+
   $("again").onclick = () => {
-    $("result").classList.add("hidden");
-    $("create").classList.remove("hidden");
+    $("result").hidden = true;
+    $("create").hidden = false;
+    window.scrollTo(0, 0);
   };
 </script>
 </body>

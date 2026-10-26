@@ -4,53 +4,135 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Mock Interview</title>
+  <meta name="theme-color" content="#fafaf9" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#0a0a0b" media="(prefers-color-scheme: dark)" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
-<main>
-  <!-- 1. Welcome -->
-  <section id="welcome">
-    <div class="eyebrow">Mock interview</div>
-    <h1 id="w-title">Loading<span class="dots"></span></h1>
-    <p class="muted" id="w-sub"></p>
-    <div class="card">
-      <p>The interviewer will ask each question out loud. Tap the mic to answer, then tap again when you're done. Expect a follow-up or two. Find a quiet spot and turn your volume up.</p>
-      <label for="name">Your first name</label>
-      <input id="name" autocomplete="given-name" placeholder="Alex" />
-      <label for="email">Email for your scorecard</label>
-      <input id="email" type="email" autocomplete="email" inputmode="email" placeholder="you@example.com" />
-      <p class="error" id="w-err"></p>
-      <button id="start" disabled>Start interview</button>
-      <p class="muted small" id="w-note"></p>
-    </div>
-  </section>
 
-  <!-- 2. Interview -->
-  <section id="interview" class="stage hidden">
-    <div class="progress" id="progress"></div>
-    <div class="eyebrow" id="q-label"></div>
-    <div class="question" id="q-text"></div>
-    <div class="transcript" id="answer" aria-live="polite"></div>
-    <textarea id="typed" class="hidden" placeholder="Type your answer..."></textarea>
-    <div class="status" id="status"></div>
-    <button class="mic" id="mic" aria-label="Answer">🎤</button>
-    <button id="submit-typed" class="hidden">Submit answer</button>
-    <div class="row">
-      <button class="link" id="repeat">Repeat question</button>
-      <button class="link" id="toggle-type">Type instead</button>
-    </div>
-  </section>
+<!-- 1. Welcome -->
+<main class="wrap fade-in" id="welcome">
+  <header class="top"><span class="brand"><span class="mark"></span>Mock Interview</span></header>
+  <p class="eyebrow">You're invited to a mock interview</p>
+  <h1 id="w-title">Loading</h1>
+  <div class="meta" id="w-meta"></div>
 
-  <!-- 3. Results -->
-  <section id="done" class="hidden">
-    <div class="eyebrow">Interview complete</div>
-    <h1 id="d-title">Scoring your answers<span class="dots"></span></h1>
-    <p class="muted" id="d-mail"></p>
-    <p class="error" id="d-err"></p>
-    <button id="retry" class="hidden">Try scoring again</button>
-    <iframe id="scorecard" class="score-frame hidden" title="Scorecard"></iframe>
-  </section>
+  <div id="prep" hidden>
+    <p class="about" id="p-about"></p>
+
+    <h3>What they look for</h3>
+    <ul class="checks" id="p-looks"></ul>
+
+    <h3>How to prepare</h3>
+    <ol class="next" id="p-prepare"></ol>
+
+    <h3>Interview tips</h3>
+    <ul class="tips" id="p-tips"></ul>
+
+    <h3>How you'll be graded</h3>
+    <div class="grade-chips" id="p-rubric"></div>
+  </div>
+
+  <h3>How it works</h3>
+  <ol class="steps">
+    <li><span class="n">1</span><div><b>Listen</b><span>Each question is read out loud.</span></div></li>
+    <li><span class="n">2</span><div><b>Answer</b><span>Tap the mic, talk, then tap again when you're done.</span></div></li>
+    <li><span class="n">3</span><div><b>Review</b><span>Get a scorecard that quotes your best lines.</span></div></li>
+  </ol>
+
+  <label class="input"><span>First name</span><input id="name" autocomplete="given-name" placeholder="Alex" /></label>
+  <label class="input"><span>Email for your scorecard</span><input id="email" type="email" autocomplete="email" inputmode="email" placeholder="you@example.com" /></label>
+  <p class="error" id="w-err"></p>
+  <button class="primary" id="start" disabled>Start interview</button>
+  <p class="fine" id="w-note">Find a quiet spot and turn your volume up.</p>
 </main>
+
+<!-- 2. Interview -->
+<div class="stage" id="interview" data-state="idle" hidden>
+  <div class="stage-top">
+    <div class="progress" id="progress"></div>
+    <span class="counter" id="counter"></span>
+  </div>
+
+  <div class="stage-mid">
+    <div class="orb" id="orb"><span class="ring"></span><span class="ring"></span><span class="core"></span><span class="sheen"></span></div>
+    <p class="q-label" id="q-label"></p>
+    <p class="question" id="q-text"></p>
+    <p class="transcript" id="answer" aria-live="polite"></p>
+    <textarea class="typed" id="typed" placeholder="Type your answer" hidden></textarea>
+  </div>
+
+  <div class="stage-bottom">
+    <p class="status" id="status"></p>
+    <div class="controls">
+      <div class="ctl">
+        <button class="round small" id="repeat" aria-label="Repeat question">
+          <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>
+        </button>
+        Repeat
+      </div>
+      <div class="ctl" id="mic-ctl">
+        <button class="round big" id="mic" aria-label="Answer"></button>
+        <span id="mic-label">Answer</span>
+      </div>
+      <div class="ctl">
+        <button class="round small" id="toggle-type" aria-label="Type instead">
+          <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/></svg>
+        </button>
+        <span id="toggle-label">Type</span>
+      </div>
+    </div>
+    <button class="primary submit-typed" id="submit-typed" hidden>Submit answer</button>
+  </div>
+</div>
+
+<!-- 3. Results -->
+<main class="wrap" id="done" hidden>
+  <header class="top"><span class="brand"><span class="mark"></span>Mock Interview</span></header>
+
+  <div class="center-load" id="d-loading" data-state="thinking">
+    <div class="orb"><span class="ring"></span><span class="ring"></span><span class="core"></span><span class="sheen"></span></div>
+    <div>
+      <h2>Scoring your interview</h2>
+      <p class="muted" style="margin:0">Grading against the rubric. About 30 seconds.</p>
+    </div>
+  </div>
+
+  <div id="d-error" hidden>
+    <h2>Scoring hit a snag</h2>
+    <p class="error" id="d-err"></p>
+    <button class="primary" id="retry">Try again</button>
+  </div>
+
+  <div id="d-result" class="fade-in" hidden>
+    <p class="eyebrow" id="d-role"></p>
+    <div class="score-hero">
+      <div class="score-ring">
+        <svg viewBox="0 0 100 100"><circle class="track" cx="50" cy="50" r="44"/><circle class="val" id="d-arc" cx="50" cy="50" r="44"/></svg>
+        <b><span id="d-score">0</span><small>/10</small></b>
+      </div>
+      <h2 id="d-headline" style="margin:0"></h2>
+    </div>
+    <p class="summary" id="d-summary"></p>
+    <p class="mail-note" id="d-mail"></p>
+
+    <h3>Role rubric</h3>
+    <div id="d-role-rubric"></div>
+
+    <h3>Baseline</h3>
+    <div id="d-baseline"></div>
+
+    <h3>Answer by answer</h3>
+    <div id="d-qs"></div>
+
+    <h3>Practice next</h3>
+    <ol class="next" id="d-next"></ol>
+  </div>
+</main>
+
 <script type="module" src="/interview.js"></script>
 </body>
 </html>
