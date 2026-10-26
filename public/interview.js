@@ -1,9 +1,8 @@
-import { initTheme, interviewerFor, face, decodePlan, post, el } from "/ui.js";
+// The lobby, the call and the scorecard. app.js opens the lobby after building, or from a shared link.
+import { interviewerFor, face, decodePlan, post, el, show } from "/ui.js";
 
 const $ = (id) => document.getElementById(id);
-const show = (id) => ["welcome", "interview", "done"].forEach((s) => ($(s).hidden = s !== id));
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-initTheme();
 
 const ICON = {
   mic: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 17v4"/></svg>',
@@ -620,59 +619,113 @@ function renderResults(card, mail, baseline) {
   $("again").href = location.href;
 }
 
-// ---------- Lobby ----------
-function renderPrep() {
-  const p = plan.prep;
-  if (!p) return;
-  $("prep").hidden = false;
-  const lists = {
-    about: () => [el("p", "about", p.about)],
-    looks: () => [el("ul", null)].map((ul) => (ul.append(...(p.looks_for || []).map((t) => el("li", null, t))), ul)),
-    prepare: () => [el("ul", null)].map((ul) => (ul.append(...(p.prepare || []).map((t) => el("li", null, t))), ul)),
-    tips: () => [el("ul", null)].map((ul) => (ul.append(...(p.tips || []).map((t) => el("li", null, t))), ul)),
-    rubric: () =>
-      [el("ul", null)].map(
-        (ul) => (ul.append(...(plan.rubric || []).map((c) => el("li", null, `${c.name}: ${c.strong}`))), ul)
-      ),
-  };
-  const pick = (tab) => {
-    $("tabs").querySelectorAll("button").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.tab === tab)));
-    $("panel").replaceChildren(...lists[tab]());
-  };
-  $("tabs").querySelectorAll("button").forEach((b) => (b.onclick = () => pick(b.dataset.tab)));
-  pick("about");
+// ---------- Lobby: prep sheet in one scroll, then join ----------
+function heading(title, note) {
+  const h = el("h2", "sec", title);
+  if (note) h.append(el("span", null, note));
+  return h;
 }
 
-async function load() {
-  try {
-    const id = location.pathname.match(/^\/i\/([a-z0-9-]+)/)?.[1] || new URLSearchParams(location.search).get("id");
-    if (id) {
-      const r = await fetch(`/api/plan?id=${encodeURIComponent(id)}`);
-      const data = await r.json();
-      if (!r.ok) throw new Error(data.error);
-      plan = data;
-    } else {
-      plan = decodePlan(location.hash.slice(1));
-    }
-    if (!plan?.questions?.length) throw new Error("This link is missing its interview.");
-  } catch (e) {
-    $("w-title").textContent = "This link doesn't work.";
-    $("w-sub").textContent = e.message || "Ask whoever sent it for a fresh link.";
-    $("portrait").hidden = true;
-    return;
+function bullets(items) {
+  const ul = el("ul", "dash");
+  ul.append(...items.map((t) => el("li", null, t)));
+  return ul;
+}
+
+function numbered(rows) {
+  const ul = el("ul", "list");
+  ul.append(
+    ...rows.map(([title, desc, small]) => {
+      const li = el("li");
+      li.append(el("b", null, title), el("span", "d", desc || ""), el("span", "s", small || ""));
+      return li;
+    })
+  );
+  return ul;
+}
+
+function more(summary, ...content) {
+  const d = el("details", "more");
+  d.append(el("summary", null, summary), ...content);
+  return d;
+}
+
+function renderPrep(baseline, creator) {
+  const p = plan.prep || {};
+  const out = [];
+  if (p.about) out.push(heading("The role"), el("p", "about", p.about));
+  if (p.looks_for?.length) out.push(heading("What they look for"), bullets(p.looks_for));
+  if (p.prepare?.length) out.push(heading("How to prepare"), bullets(p.prepare));
+  if (p.tips?.length) out.push(heading("Tips for the call"), bullets(p.tips));
+  out.push(
+    heading("Graded on", plan.research ? "From the posting + research" : "From the posting"),
+    numbered((plan.rubric || []).map((c) => [c.name, c.strong, creator ? c.source : ""]))
+  );
+  if (baseline?.length) {
+    const names = baseline.map((c) => c.name.toLowerCase());
+    out.push(el("p", "basics", `Plus the basics every interview is graded on: ${names.slice(0, -1).join(", ")}, and ${names.at(-1)}.`));
   }
+  if (creator && plan.sources?.length) {
+    const ul = el("ul", "list sources");
+    ul.append(
+      ...plan.sources.map((s) => {
+        const li = el("li");
+        const a = el("a", null, s.title);
+        a.href = s.url;
+        a.target = "_blank";
+        a.rel = "noopener";
+        li.append(a, el("span", "s", new URL(s.url).hostname.replace(/^www\./, "")));
+        return li;
+      })
+    );
+    out.push(more("Research sources", ul));
+  }
+  if (creator) out.push(more("The questions (spoilers if you're taking it yourself)", numbered(plan.questions.map((x) => [x.ask, "", x.why]))));
+  $("prep").replaceChildren(...out);
+}
+
+export function openLobby(p, { baseline, creator = false } = {}) {
+  plan = p;
   person = interviewerFor(plan);
   document.title = `Interview: ${plan.role} at ${plan.company}`;
+  $("portrait").hidden = false;
+  $("portrait").querySelector(".face, .mono-face")?.remove();
   $("portrait").prepend(face(person, 900));
   $("w-who").textContent = `${person.name} is ready`;
-  $("w-kicker").textContent = `Mock interview · ${plan.company}`;
+  if (creator) $("w-kicker").innerHTML = plan.demo ? "Demo mode · <b>add an API key for real research</b>" : "Ready · <b>start now or share the link</b>";
+  else $("w-kicker").textContent = `Mock interview · ${plan.company}`;
   $("w-title").replaceChildren(document.createTextNode(plan.role + " "), el("em", null, `at ${plan.company}`));
   $("w-sub").textContent = `With ${person.name} · ${plan.questions.length} questions · about ${plan.questions.length * 2} minutes`;
   $("tile-face").replaceChildren(face(person, 1000, 1400));
   $("tile-name").textContent = `${person.name} · ${plan.company}`;
   $("d-face").replaceChildren(face(person, 200));
   $("d-loading-title").textContent = `${person.name} is writing up your scorecard`;
-  renderPrep();
+  $("share-box").hidden = true;
+  renderPrep(baseline, creator);
   $("start").disabled = false;
+  show("welcome");
+  window.scrollTo(0, 0);
 }
-load();
+
+export async function loadFromLink() {
+  show("welcome");
+  let p, baseline;
+  try {
+    const id = location.pathname.match(/^\/i\/([a-z0-9-]+)/)?.[1] || new URLSearchParams(location.search).get("id");
+    if (id) {
+      const r = await fetch(`/api/plan?id=${encodeURIComponent(id)}`);
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error);
+      ({ plan: p, baseline } = data);
+    } else {
+      p = decodePlan(location.hash.slice(1));
+    }
+    if (!p?.questions?.length) throw new Error("This link is missing its interview.");
+  } catch (e) {
+    $("w-title").textContent = "This link doesn't work.";
+    $("w-sub").textContent = e.message || "Ask whoever sent it for a fresh link.";
+    $("portrait").hidden = true;
+    return;
+  }
+  openLobby(p, { baseline });
+}

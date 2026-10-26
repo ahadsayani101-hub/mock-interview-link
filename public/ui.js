@@ -1,4 +1,7 @@
-// Shared bits for both pages: theme switch, interviewer faces, link packing, API calls.
+// Shared bits: page steps, theme switch, interviewer faces, link packing, API calls.
+
+// The app is one page; each step is a section and only one shows at a time.
+export const show = (id) => ["create", "welcome", "interview", "done"].forEach((s) => (document.getElementById(s).hidden = s !== id));
 
 // ---------- Theme ----------
 export function initTheme() {

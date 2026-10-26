@@ -13,6 +13,7 @@
   <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
+<!-- One page, four steps: build → lobby (share + prep + join) → call → scorecard -->
 <main class="page">
   <header class="bar">
     <a class="logo" href="/">Mock <i>Interview</i></a>
@@ -24,11 +25,11 @@
     </button>
   </header>
 
-  <!-- Create -->
-  <section id="create" class="fade">
+  <!-- 1. Build -->
+  <section id="create" class="fade" hidden>
     <p class="kicker">Voice mock interviews · <b>graded</b></p>
     <h1 class="display">Rehearse the <em>real</em> interview.</h1>
-    <p class="sub">Drop in a job. We research the company, write the questions and the rubric, and hand you a link. Open it on your phone and talk it through with an interviewer who actually listens.</p>
+    <p class="sub">Drop in a job. We research the company, write the questions and the rubric, and hand you a link. Talk it through right here, or send the link to someone else.</p>
 
     <div class="faces">
       <div class="stack" id="faces"></div>
@@ -68,213 +69,129 @@
     </form>
   </section>
 
-  <!-- Result -->
-  <section id="result" class="fade" hidden>
-    <p class="kicker" id="r-kicker">Ready to share</p>
-    <h1 class="display md" id="r-title"></h1>
+  <!-- 2. Lobby: share link (for whoever built it), prep sheet, join -->
+  <section id="welcome" class="fade" hidden>
+    <div class="portrait" id="portrait"><span class="tag"><span class="dot"></span><span id="w-who">Loading</span></span></div>
+    <p class="kicker" id="w-kicker">Mock interview</p>
+    <h1 class="display md" id="w-title">Loading</h1>
+    <p class="sub" id="w-sub"></p>
 
-    <div class="ticket">
-      <div class="ticket-head">
-        <span id="r-face"></span>
-        <div><b id="r-who"></b><span>Your interviewer</span></div>
-        <div class="right" id="r-meta"></div>
-      </div>
-      <div class="perf"></div>
-      <div class="ticket-body">
-        <div>
-          <span class="l">Interview link</span>
-          <button class="link-text" id="short" type="button"></button>
-          <span class="copied" id="copied"></span>
+    <div class="share" id="share-box" hidden>
+      <div class="ticket">
+        <div class="ticket-body">
+          <div>
+            <span class="l">Send this link to anyone</span>
+            <button class="link-text" id="short" type="button"></button>
+            <span class="copied" id="copied"></span>
+          </div>
+          <div id="qr"></div>
         </div>
-        <div id="qr"></div>
       </div>
+      <button class="cta ghost" id="share" type="button">Share</button>
     </div>
 
-    <div class="row2">
-      <button class="cta center" id="share">Share</button>
-      <button class="cta ghost" id="open">Try it yourself</button>
+    <div class="prep" id="prep"></div>
+
+    <div class="join">
+      <label class="line"><span class="n">01</span><span class="l">Your first name</span><input id="name" autocomplete="given-name" placeholder="Alex" /></label>
+      <label class="line"><span class="n">02</span><span class="l">Email for your scorecard</span><input id="email" type="email" autocomplete="email" inputmode="email" placeholder="you@example.com" /></label>
+      <label class="check"><input type="checkbox" id="cam" checked /> Show my camera so it feels like a real call. Only you see it, nothing is recorded.</label>
+      <p class="error" id="w-err"></p>
     </div>
 
-    <h2 class="sec">Graded on <span id="rubric-note"></span></h2>
-    <ul class="list" id="rubric"></ul>
-    <details class="more">
-      <summary>Plus the baseline every interview gets</summary>
-      <ul class="list" id="baseline"></ul>
-    </details>
+    <div class="sticky">
+      <button class="cta" id="start" disabled>
+        <span>Join interview</span>
+        <span class="arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+      </button>
+      <p class="fine" id="w-note">Headphones help. Talk naturally; you can interrupt.</p>
+    </div>
+  </section>
 
-    <div id="sources-wrap" hidden>
-      <h2 class="sec">Research</h2>
-      <ul class="list sources" id="sources"></ul>
+  <!-- 4. Scorecard -->
+  <section id="done" hidden>
+    <div class="loading-card" id="d-loading">
+      <span id="d-face"></span>
+      <h2 class="display md" id="d-loading-title">Writing up your scorecard</h2>
+      <p class="working"><span class="bar-anim"></span><span>Grading against the rubric</span></p>
     </div>
 
-    <h2 class="sec">Questions <span>Asked in the interviewer's own words</span></h2>
-    <ul class="list" id="qs"></ul>
+    <div id="d-error" hidden>
+      <h2 class="display md">Scoring hit a snag.</h2>
+      <p class="error" id="d-err"></p>
+      <button class="cta center" id="retry">Try again</button>
+    </div>
 
-    <button class="text-btn" id="again">← Build another</button>
+    <div id="d-result" class="fade" hidden>
+      <p class="kicker" id="d-role"></p>
+      <div class="bigscore"><span class="num" id="d-score">0</span><span class="of">/10</span></div>
+      <h1 class="display md" id="d-headline"></h1>
+      <p class="sub" id="d-summary"></p>
+      <p class="mailnote" id="d-mail"></p>
+
+      <h2 class="sec">Role rubric <span>60% of your score</span></h2>
+      <div id="d-role-rubric"></div>
+      <h2 class="sec">Baseline <span>40%</span></h2>
+      <div id="d-baseline"></div>
+      <h2 class="sec">Answer by answer</h2>
+      <div id="d-qs"></div>
+      <h2 class="sec">Practice next</h2>
+      <ol class="steps-list" id="d-next"></ol>
+
+      <div style="margin-top:32px"><a class="cta center" id="again" href="">Practice again</a></div>
+      <a class="text-btn" href="/">← Build another interview</a>
+    </div>
   </section>
 </main>
 
-<script type="module">
-  import { initTheme, INTERVIEWERS, face, encodePlan, post, el } from "/ui.js";
-  import qrcode from "/vendor/qrcode.js";
-  const $ = (id) => document.getElementById(id);
-  initTheme();
+<!-- 3. The call (full screen over the page) -->
+<div class="call" id="interview" hidden>
+  <div class="call-top">
+    <span class="live"></span><span id="timer">00:00</span>
+    <span id="q-progress"></span>
+    <span class="progress" id="progress"></span>
+  </div>
 
-  const people = Object.values(INTERVIEWERS);
-  $("faces").replaceChildren(...people.map((p) => face(p, 120)));
+  <div class="tile" id="tile" data-state="connecting">
+    <span id="tile-face"></span>
+    <div class="shade"></div>
+    <div class="nametag"><span class="bars"><i></i><i></i><i></i></span><span id="tile-name"></span></div>
+    <video class="self" id="self" playsinline muted autoplay hidden></video>
+    <div class="captions" id="captions"><p class="them" id="cap-them"></p><p class="you" id="cap-you"></p></div>
+    <textarea class="typed" id="typed" placeholder="Type your answer" hidden></textarea>
+  </div>
 
-  // Single-choice chip groups
-  function chips(group, onPick) {
-    group.querySelectorAll("button").forEach((b) => {
-      b.onclick = () => {
-        group.querySelectorAll("button").forEach((x) => x.setAttribute("aria-checked", String(x === b)));
-        onPick(b.dataset.v);
-      };
-    });
-  }
-  let count = 5;
-  chips($("count"), (v) => (count = Number(v)));
+  <p class="call-status" id="status">Connecting</p>
 
-  let interviewer = people[Math.floor(Math.random() * people.length)].id;
-  $("who").replaceChildren(
-    ...people.map((p) => {
-      const b = el("button", "chip-btn");
-      b.type = "button";
-      b.setAttribute("role", "radio");
-      b.setAttribute("aria-checked", String(p.id === interviewer));
-      b.dataset.v = p.id;
-      b.append(face(p, 80), p.name);
-      return b;
-    })
-  );
-  chips($("who"), (v) => (interviewer = v));
+  <!-- Live mode: hands-free -->
+  <div class="call-controls" id="live-controls">
+    <button class="cbtn" id="mute" aria-label="Mute">
+      <svg class="mic-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 17v4"/></svg>
+    </button>
+    <button class="cbtn end" id="end" aria-label="End interview">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 9c-2.6 0-5.1.5-7.4 1.5-.8.3-1.2 1.1-1.1 1.9l.3 2c.1.7.8 1.2 1.5 1.1l3-.5c.6-.1 1.1-.6 1.1-1.2l.1-1.6c1.6-.4 3.4-.4 5 0l.1 1.6c0 .6.5 1.1 1.1 1.2l3 .5c.7.1 1.4-.4 1.5-1.1l.3-2c.1-.8-.3-1.6-1.1-1.9C17.1 9.5 14.6 9 12 9z"/></svg>
+    </button>
+    <button class="cbtn" id="cc" aria-label="Captions">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M10 10.5a2 2 0 1 0 0 3M16 10.5a2 2 0 1 0 0 3"/></svg>
+    </button>
+  </div>
 
-  if (navigator.clipboard?.readText) {
-    $("paste").hidden = false;
-    $("paste").onclick = async () => {
-      try {
-        $("posting").value = await navigator.clipboard.readText();
-        $("posting").dispatchEvent(new Event("input"));
-      } catch {}
-    };
-  }
-  $("posting").oninput = () => {
-    const n = $("posting").value.trim().split(/\s+/).filter(Boolean).length;
-    $("words").textContent = `${n} word${n === 1 ? "" : "s"}`;
-  };
+  <!-- Classic mode: tap to talk (used when the live voice isn't available) -->
+  <div class="call-controls" id="classic-controls" hidden>
+    <button class="cbtn" id="repeat" aria-label="Repeat question">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>
+    </button>
+    <button class="cbtn talk" id="talk" aria-label="Answer"></button>
+    <button class="cbtn" id="type" aria-label="Type instead">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/></svg>
+    </button>
+    <button class="cbtn end" id="end2" aria-label="End interview">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 9c-2.6 0-5.1.5-7.4 1.5-.8.3-1.2 1.1-1.1 1.9l.3 2c.1.7.8 1.2 1.5 1.1l3-.5c.6-.1 1.1-.6 1.1-1.2l.1-1.6c1.6-.4 3.4-.4 5 0l.1 1.6c0 .6.5 1.1 1.1 1.2l3 .5c.7.1 1.4-.4 1.5-1.1l.3-2c.1-.8-.3-1.6-1.1-1.9C17.1 9.5 14.6 9 12 9z"/></svg>
+    </button>
+  </div>
+  <audio id="remote" autoplay playsinline></audio>
+</div>
 
-  let timer;
-  function working(company) {
-    const steps = [
-      `Researching ${company}`,
-      "Reading the job description",
-      "Finding what interviewers look for",
-      "Building your rubric",
-      "Writing the questions",
-      "Writing your prep sheet",
-      "Still digging. Good research takes a minute",
-    ];
-    let i = 0;
-    const show = () => {
-      $("note").replaceChildren(el("span", "bar-anim"), el("span", null, steps[Math.min(i++, steps.length - 1)]));
-    };
-    show();
-    timer = setInterval(show, 9000);
-  }
-
-  $("form").onsubmit = async (e) => {
-    e.preventDefault();
-    $("err").textContent = "";
-    const company = $("company").value.trim();
-    $("go").disabled = true;
-    $("go-label").textContent = "Building";
-    working(company || "the company");
-    try {
-      const { plan, id, baseline } = await post("/api/create", {
-        company,
-        position: $("position").value,
-        posting: $("posting").value,
-        count,
-        interviewer,
-      });
-      render(plan, id, baseline);
-    } catch (err) {
-      $("err").textContent = err.message;
-    } finally {
-      clearInterval(timer);
-      $("note").textContent = "";
-      $("go").disabled = false;
-      $("go-label").textContent = "Build my interview";
-    }
-  };
-
-  function render(plan, id, baseline) {
-    const url = id ? `${location.origin}/i/${id}` : `${location.origin}/i#${encodePlan(plan)}`;
-    const person = INTERVIEWERS[plan.interviewer] || people[0];
-
-    $("r-kicker").innerHTML = plan.demo ? "Demo mode · <b>add an API key for real research</b>" : "Ready to share";
-    $("r-title").replaceChildren(document.createTextNode(plan.role + " "), el("em", null, `at ${plan.company}`));
-    $("r-face").replaceChildren(face(person, 120));
-    $("r-who").textContent = person.name;
-    $("r-meta").innerHTML = `${plan.questions.length} questions<br>~${plan.questions.length * 2} min`;
-    $("short").textContent = id ? url.replace(/^https?:\/\//, "") : "Copy long link";
-
-    try {
-      const qr = qrcode(0, "L");
-      qr.addData(url);
-      qr.make();
-      $("qr").innerHTML = qr.createSvgTag({ cellSize: 3, margin: 2, scalable: true });
-    } catch {
-      $("qr").textContent = "";
-    }
-
-    const item = (title, desc, small) => {
-      const li = el("li");
-      li.append(el("b", null, title), el("span", "d", desc), el("span", "s", small || ""));
-      return li;
-    };
-    $("rubric-note").textContent = plan.research ? "From the posting + research" : "From the posting";
-    $("rubric").replaceChildren(...plan.rubric.map((c) => item(c.name, c.strong, c.source)));
-    $("baseline").replaceChildren(...(baseline || []).map((c) => item(c.name, c.strong)));
-    $("sources-wrap").hidden = !plan.sources?.length;
-    $("sources").replaceChildren(
-      ...(plan.sources || []).map((s) => {
-        const li = el("li");
-        const a = el("a", null, s.title);
-        a.href = s.url;
-        a.target = "_blank";
-        a.rel = "noopener";
-        li.append(a, el("span", "s", new URL(s.url).hostname.replace(/^www\./, "")));
-        return li;
-      })
-    );
-    $("qs").replaceChildren(...plan.questions.map((q) => item(q.ask, "", q.why)));
-
-    const copy = async () => {
-      try {
-        await navigator.clipboard.writeText(url);
-        $("copied").textContent = "Copied to clipboard";
-      } catch {
-        $("copied").textContent = "Couldn't copy. Press and hold the link instead.";
-      }
-      setTimeout(() => ($("copied").textContent = ""), 2000);
-    };
-    $("short").onclick = copy;
-    $("share").textContent = navigator.share ? "Share" : "Copy link";
-    $("share").onclick = () =>
-      navigator.share ? navigator.share({ title: `Mock interview: ${plan.role} at ${plan.company}`, url }).catch(() => {}) : copy();
-    $("open").onclick = () => window.open(url, "_blank");
-
-    $("create").hidden = true;
-    $("result").hidden = false;
-    window.scrollTo(0, 0);
-  }
-
-  $("again").onclick = () => {
-    $("result").hidden = true;
-    $("create").hidden = false;
-    window.scrollTo(0, 0);
-  };
-</script>
+<script type="module" src="/app.js"></script>
 </body>
 </html>

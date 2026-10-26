@@ -1,6 +1,9 @@
 {
   "cleanUrls": true,
-  "rewrites": [{ "source": "/i/:id", "destination": "/i.html" }],
+  "rewrites": [
+    { "source": "/i", "destination": "/" },
+    { "source": "/i/:id", "destination": "/" }
+  ],
   "functions": {
     "api/create.js": { "maxDuration": 300 },
     "api/turn.js": { "maxDuration": 60 },
