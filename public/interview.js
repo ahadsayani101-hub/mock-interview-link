@@ -1,37 +1,199 @@
-import { decodePlan, post } from "/share.js";
+import { initTheme, interviewerFor, face, decodePlan, post, el } from "/ui.js";
 
 const $ = (id) => document.getElementById(id);
 const show = (id) => ["welcome", "interview", "done"].forEach((s) => ($(s).hidden = s !== id));
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const CLOSING = "That's the end of the interview. Thanks so much. I'm putting together your scorecard now.";
+initTheme();
 
 const ICON = {
-  mic: '<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 17v4"/></svg>',
-  stop: '<svg class="i" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2.5" fill="currentColor"/></svg>',
-  mail: '<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>',
+  mic: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 17v4"/></svg>',
+  micOff: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18M9 9v1a3 3 0 0 0 5.1 2.1M15 9.3V5a3 3 0 0 0-5.7-1.3M5 10a7 7 0 0 0 11.5 5.4M19 10a7 7 0 0 1-.6 2.8M12 17v4"/></svg>',
+  stop: '<svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2.5" fill="currentColor"/></svg>',
 };
 
-let plan;
-const transcript = []; // [{ exchanges: [{ q, a }] }] per question
+let plan, person;
+const turns = []; // the whole conversation: { who: "interviewer" | "candidate", text, q }
+let q = -1; // index of the main question being discussed
+let ended = false;
 
-// ---------- Speech output ----------
-let voice;
-function pickVoice() {
-  const vs = speechSynthesis.getVoices().filter((v) => v.lang?.startsWith("en"));
-  // Prefer the higher-quality voices some devices ship with.
-  const pref = ["(Natural)", "(Premium)", "(Enhanced)", "Samantha", "Google US English", "Microsoft Aria", "Karen", "Daniel"];
-  voice =
-    pref.map((n) => vs.find((v) => v.name.includes(n) && v.lang === "en-US") || vs.find((v) => v.name.includes(n))).find(Boolean) ||
-    vs.find((v) => v.default) ||
-    vs[0];
-}
-if ("speechSynthesis" in window) {
-  pickVoice();
-  speechSynthesis.onvoiceschanged = pickVoice;
+// ---------- Call screen ----------
+let clock;
+function startClock() {
+  const t0 = Date.now();
+  clock = setInterval(() => {
+    const s = Math.floor((Date.now() - t0) / 1000);
+    $("timer").textContent = `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+  }, 1000);
 }
 
-// Natural voice from the server (/api/speak). If the server has no voice key, fall back to the
-// browser's built-in voice for the rest of the session.
+function setQuestion(i) {
+  q = Math.max(0, Math.min(plan.questions.length - 1, Number(i) || 0));
+  $("q-progress").textContent = `Question ${q + 1} of ${plan.questions.length}`;
+  $("progress").replaceChildren(...plan.questions.map((_, k) => el("i", k <= q ? "on" : "")));
+}
+
+const status = (t) => ($("status").textContent = t);
+const captionThem = (t) => ($("cap-them").textContent = t);
+const captionYou = (t) => ($("cap-you").textContent = t);
+function speaking(on) {
+  $("tile").toggleAttribute("data-speaking", on);
+  if (on) status(`${person.name} is speaking`);
+}
+
+// Gently zoom the interviewer's photo with the loudness of their voice.
+let audioCtx;
+function meter(stream) {
+  try {
+    const an = audioCtx.createAnalyser();
+    an.fftSize = 256;
+    audioCtx.createMediaStreamSource(stream).connect(an);
+    const buf = new Uint8Array(an.fftSize);
+    const tick = () => {
+      an.getByteTimeDomainData(buf);
+      let sum = 0;
+      for (const v of buf) sum += (v - 128) ** 2;
+      const lvl = Math.min(1, (Math.sqrt(sum / buf.length) / 128) * 5);
+      $("tile").style.setProperty("--lvl", lvl.toFixed(3));
+      if (!ended) requestAnimationFrame(tick);
+    };
+    tick();
+  } catch { /* purely cosmetic */ }
+}
+
+// ---------- Live mode: a real-time, hands-free conversation ----------
+let pc, dc, micTrack, ending = false;
+const send = (msg) => dc?.readyState === "open" && dc.send(JSON.stringify(msg));
+const byItem = new Map();
+
+function turnFor(id, who) {
+  let t = byItem.get(id);
+  if (!t) {
+    t = { who, text: "", q }; // q is -1 during the small talk before the first question
+    byItem.set(id, t);
+    turns.push(t);
+  }
+  return t;
+}
+
+async function startLive(stream) {
+  const name = $("name").value.trim();
+  const { value } = await post("/api/realtime", { plan, name });
+
+  pc = new RTCPeerConnection();
+  pc.ontrack = (e) => {
+    $("remote").srcObject = e.streams[0];
+    meter(e.streams[0]);
+  };
+  micTrack = stream.getAudioTracks()[0];
+  pc.addTrack(micTrack, new MediaStream([micTrack]));
+
+  dc = pc.createDataChannel("oai-events");
+  dc.onmessage = (e) => onLiveEvent(JSON.parse(e.data));
+  dc.onopen = () => {
+    $("tile").dataset.state = "live";
+    status(`${person.name} joined`);
+    send({ type: "response.create" }); // the interviewer speaks first
+  };
+  pc.onconnectionstatechange = () => {
+    if (pc.connectionState === "failed" && !ended) {
+      status("The connection dropped. Wrapping up");
+      hangUp();
+    }
+  };
+
+  const offer = await pc.createOffer();
+  await pc.setLocalDescription(offer);
+  const r = await fetch("https://api.openai.com/v1/realtime/calls", {
+    method: "POST",
+    body: offer.sdp,
+    headers: { Authorization: `Bearer ${value}`, "Content-Type": "application/sdp" },
+  });
+  if (!r.ok) throw new Error(`Voice connection failed (${r.status})`);
+  await pc.setRemoteDescription({ type: "answer", sdp: await r.text() });
+}
+
+function onLiveEvent(ev) {
+  switch (ev.type) {
+    case "input_audio_buffer.speech_started":
+      turnFor(ev.item_id, "candidate");
+      captionYou("…");
+      status("Listening");
+      break;
+    case "input_audio_buffer.speech_stopped":
+      status(`${person.name} is thinking`);
+      break;
+    case "conversation.item.input_audio_transcription.delta": {
+      const t = turnFor(ev.item_id, "candidate");
+      t.text += ev.delta || "";
+      captionYou(t.text);
+      break;
+    }
+    case "conversation.item.input_audio_transcription.completed": {
+      const t = turnFor(ev.item_id, "candidate");
+      t.text = (ev.transcript || "").trim();
+      captionYou(t.text);
+      break;
+    }
+    case "response.output_audio_transcript.delta":
+    case "response.audio_transcript.delta": {
+      const t = turnFor(ev.item_id, "interviewer");
+      if (!t.text) captionYou("");
+      t.text += ev.delta || "";
+      captionThem(t.text);
+      speaking(true);
+      break;
+    }
+    case "response.output_audio_transcript.done":
+    case "response.audio_transcript.done": {
+      const t = turnFor(ev.item_id, "interviewer");
+      if (ev.transcript) t.text = ev.transcript;
+      captionThem(t.text);
+      break;
+    }
+    case "output_audio_buffer.started":
+      speaking(true);
+      break;
+    case "output_audio_buffer.stopped":
+    case "output_audio_buffer.cleared":
+      speaking(false);
+      if (ending) setTimeout(hangUp, 600);
+      else if (!$("tile").hasAttribute("data-speaking")) status("Your turn. Just talk");
+      break;
+    case "response.done":
+      handleToolCalls(ev.response);
+      break;
+    case "error":
+      console.warn("Realtime error", ev.error);
+      break;
+  }
+}
+
+function handleToolCalls(response) {
+  for (const item of response?.output || []) {
+    if (item.type !== "function_call") continue;
+    let args = {};
+    try { args = JSON.parse(item.arguments || "{}"); } catch {}
+    const reply = (output) =>
+      send({ type: "conversation.item.create", item: { type: "function_call_output", call_id: item.call_id, output: JSON.stringify(output) } });
+
+    if (item.name === "set_question") {
+      setQuestion(args.index);
+      // If the question was already spoken in this same response, file it under the new question.
+      const last = turns.at(-1);
+      if (last?.who === "interviewer" && last.text.includes("?")) last.q = q;
+      reply({ ok: true, question: plan.questions[q].ask });
+      send({ type: "response.create" });
+    } else if (item.name === "end_interview") {
+      ending = true;
+      reply({ ok: true });
+      // Hang up when the goodbye finishes playing (or soon, if it already has).
+      setTimeout(hangUp, $("tile").hasAttribute("data-speaking") ? 12000 : 1500);
+    }
+  }
+}
+
+// ---------- Classic mode: tap to talk (when live voice isn't available) ----------
+// Interviewer voice from /api/speak, falling back to the browser's built-in voice.
 let cloudVoice = true;
 const player = new Audio();
 const audioCache = new Map();
@@ -39,22 +201,20 @@ const audioCache = new Map();
 function fetchAudio(text) {
   if (!cloudVoice || !text) return Promise.resolve(null);
   if (!audioCache.has(text)) {
-    const p = fetch("/api/speak", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text }),
-    })
-      .then(async (r) => {
-        if (r.status === 501) cloudVoice = false;
-        return r.ok ? URL.createObjectURL(await r.blob()) : null;
-      })
-      .catch(() => null);
-    audioCache.set(text, p);
+    audioCache.set(
+      text,
+      fetch("/api/speak", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text, voice: plan.interviewer }) })
+        .then(async (r) => {
+          if (r.status === 501) cloudVoice = false;
+          return r.ok ? URL.createObjectURL(await r.blob()) : null;
+        })
+        .catch(() => null)
+    );
   }
   return audioCache.get(text);
 }
 
-// iOS only lets a page play audio after a tap; play a blank clip inside the Start tap.
+// iOS only lets a page play audio after a tap; play a blank clip inside the Join tap.
 function unlockAudio() {
   const rate = 8000, n = 800;
   const buf = new DataView(new ArrayBuffer(44 + n * 2));
@@ -86,10 +246,15 @@ function playUrl(url) {
   });
 }
 
-async function speak(text) {
-  const url = await fetchAudio(text);
-  if (url && (await playUrl(url))) return;
-  return browserSpeak(text);
+let voice;
+function pickVoice() {
+  const vs = speechSynthesis.getVoices().filter((v) => v.lang?.startsWith("en"));
+  const pref = ["(Natural)", "(Premium)", "(Enhanced)", "Samantha", "Google US English", "Microsoft Aria", "Karen", "Daniel"];
+  voice = pref.map((n) => vs.find((v) => v.name.includes(n))).find(Boolean) || vs.find((v) => v.default) || vs[0];
+}
+if ("speechSynthesis" in window) {
+  pickVoice();
+  speechSynthesis.onvoiceschanged = pickVoice;
 }
 
 function browserSpeak(text) {
@@ -99,7 +264,6 @@ function browserSpeak(text) {
     const u = new SpeechSynthesisUtterance(text);
     if (voice) u.voice = voice;
     u.rate = 1.02;
-    // Some browsers never fire onend; don't hang the interview on it.
     const timer = setTimeout(resolve, 2000 + text.length * 90);
     u.onend = u.onerror = () => {
       clearTimeout(timer);
@@ -109,28 +273,19 @@ function browserSpeak(text) {
   });
 }
 
-// ---------- Speech input ----------
+async function say(text) {
+  captionThem(text);
+  captionYou("");
+  speaking(true);
+  const url = await fetchAudio(text);
+  if (!(url && (await playUrl(url)))) await browserSpeak(text);
+  speaking(false);
+}
+
 const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 let typing = !Recognition;
 let rec, recording = false, committed = "", live = "";
-
-function render() {
-  $("answer").textContent = (committed + " " + live).trim();
-  $("answer").scrollTop = 1e6;
-}
-
-function startRecording() {
-  committed = "";
-  live = "";
-  render();
-  recording = true;
-  setState("listening");
-  $("mic").classList.add("rec");
-  $("mic").innerHTML = ICON.stop;
-  $("mic-label").textContent = "Done";
-  $("status").textContent = "Listening";
-  listen();
-}
+let answerResolve, current;
 
 function listen() {
   rec = new Recognition();
@@ -139,18 +294,14 @@ function listen() {
   rec.interimResults = true;
   rec.onresult = (e) => {
     live = Array.from(e.results, (r) => r[0].transcript).join(" ");
-    render();
-    // Small pulse on the orb so the speaker can see they're being heard.
-    $("orb").classList.add("blip");
-    setTimeout(() => $("orb").classList.remove("blip"), 120);
+    captionYou((committed + " " + live).trim());
   };
   rec.onerror = (e) => {
     if (e.error === "not-allowed" || e.error === "service-not-allowed") {
       recording = false;
-      resetMic();
+      resetTalk();
       setTyping(true);
-      setState("idle");
-      $("status").textContent = "Microphone is blocked, so type your answer instead.";
+      status("Microphone is blocked, so type your answer");
     }
   };
   // Mobile browsers stop listening after a pause; keep going until the user taps done.
@@ -158,22 +309,21 @@ function listen() {
     committed = (committed + " " + live).trim();
     live = "";
     if (recording) {
-      try { listen(); } catch { /* ignore */ }
+      try { listen(); } catch {}
     }
   };
   rec.start();
 }
 
-function resetMic() {
-  $("mic").classList.remove("rec");
-  $("mic").innerHTML = ICON.mic;
-  $("mic-label").textContent = "Answer";
+function resetTalk() {
+  $("talk").classList.remove("rec");
+  $("talk").innerHTML = ICON.mic;
 }
 
 function stopRecording() {
   return new Promise((resolve) => {
     recording = false;
-    resetMic();
+    resetTalk();
     if (!rec) return resolve((committed + " " + live).trim());
     const finish = () => resolve((committed + " " + live).trim());
     rec.onend = () => {
@@ -189,246 +339,162 @@ function stopRecording() {
 function setTyping(on) {
   typing = on;
   $("typed").hidden = !on;
-  $("submit-typed").hidden = !on;
-  $("mic-ctl").style.visibility = on ? "hidden" : "visible";
-  $("answer").hidden = on;
-  $("toggle-label").textContent = on ? "Voice" : "Type";
-  $("toggle-type").parentElement.style.visibility = Recognition ? "visible" : "hidden";
+  $("talk").innerHTML = on ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>' : ICON.mic;
+  $("type").hidden = !Recognition;
   if (on) setTimeout(() => $("typed").focus(), 50);
 }
 
-// ---------- Interview flow ----------
-let qIndex = 0;
-let current;
-let answerResolve;
-
-const setState = (s) => ($("interview").dataset.state = s);
-
-function waitForAnswer() {
-  return new Promise((resolve) => (answerResolve = resolve));
-}
-
-function lock(locked, status) {
-  $("mic").disabled = locked;
-  $("submit-typed").disabled = locked;
+function lock(locked) {
+  $("talk").disabled = locked;
   $("repeat").disabled = locked;
-  $("status").textContent = status || "";
 }
 
-async function ask(text, label) {
+async function ask(text) {
   current = text;
-  $("q-label").textContent = label;
-  $("q-text").textContent = text;
-  $("answer").textContent = "";
-  $("typed").value = "";
-  setState("speaking");
-  lock(true, "");
-  await speak(text);
-  setState("idle");
-  lock(false, typing ? "Type your answer, then submit" : "Tap the mic when you're ready");
-  return waitForAnswer();
+  turns.push({ who: "interviewer", text, q });
+  lock(true);
+  await say(text);
+  if (ended) return "";
+  lock(false);
+  status(typing ? "Type your answer, then tap the arrow" : "Tap the mic to answer");
+  const a = await new Promise((resolve) => (answerResolve = resolve));
+  turns.push({ who: "candidate", text: a, q });
+  return a;
 }
 
-function renderProgress() {
-  const n = plan.questions.length;
-  $("progress").innerHTML = plan.questions
-    .map((_, i) => `<span class="${i < qIndex ? "done" : i === qIndex ? "now" : ""}"></span>`)
-    .join("");
-  $("counter").textContent = `${Math.min(qIndex + 1, n)}/${n}`;
-}
-
-async function run() {
-  show("interview");
-  $("mic").innerHTML = ICON.mic;
+async function runClassic() {
+  $("live-controls").hidden = true;
+  $("classic-controls").hidden = false;
+  $("tile").dataset.state = "live";
   setTyping(typing);
   const name = $("name").value.trim();
-  qIndex = 0;
-  renderProgress();
-  $("q-label").textContent = "";
-  $("q-text").textContent = `Hi${name ? " " + name : ""}, let's get started.`;
-  setState("speaking");
-  lock(true);
-  const greeting = `Hi${name ? " " + name : ""}, thanks for coming in. Let's get started.`;
+  const greeting = `Hi${name ? " " + name : ""}, I'm ${person.name}. Thanks for making the time. Let's dive in.`;
   fetchAudio(greeting);
-  // Fetch every main question's audio now so there's no pause before each one.
-  plan.questions.forEach((q) => fetchAudio(q.ask));
-  fetchAudio(CLOSING);
-  await speak(greeting);
+  plan.questions.forEach((x) => fetchAudio(x.ask));
+  await say(greeting);
 
-  for (qIndex = 0; qIndex < plan.questions.length; qIndex++) {
-    renderProgress();
-    const entry = { exchanges: [] };
-    transcript.push(entry);
-    let q = plan.questions[qIndex].ask;
-    let followUp = false;
-    while (true) {
-      const a = await ask(q, followUp ? "Follow-up" : plan.questions[qIndex].why);
-      entry.exchanges.push({ q, a });
-      setState("thinking");
-      lock(true, "");
+  for (let i = 0; i < plan.questions.length && !ended; i++) {
+    setQuestion(i);
+    const exchanges = [];
+    let text = plan.questions[i].ask;
+    while (!ended) {
+      const a = await ask(text);
+      if (ended) break;
+      exchanges.push({ q: text, a });
+      lock(true);
+      status(`${person.name} is thinking`);
       let t;
       try {
-        t = await post("/api/turn", { plan, index: qIndex, exchanges: entry.exchanges });
+        t = await post("/api/turn", { plan, index: i, exchanges });
       } catch {
         t = { action: "next", say: "Thanks." };
       }
       if (t.action === "followup" && t.say) {
-        q = t.say;
-        followUp = true;
+        text = t.say;
         continue;
       }
       if (t.say) {
-        $("q-label").textContent = "";
-        $("q-text").textContent = t.say;
-        $("answer").textContent = "";
-        setState("speaking");
-        await speak(t.say);
+        turns.push({ who: "interviewer", text: t.say, q });
+        await say(t.say);
       }
       break;
     }
   }
-  speak(CLOSING);
-  finish();
+  if (ended) return;
+  await say("That's everything I wanted to ask. Thanks so much. Your scorecard is on its way.");
+  hangUp();
 }
 
-// ---------- Results ----------
-async function finish() {
-  show("done");
-  window.scrollTo(0, 0);
-  $("d-loading").hidden = false;
-  $("d-error").hidden = true;
-  $("d-result").hidden = true;
-  try {
-    const email = $("email").value.trim();
-    const r = await post("/api/finish", { plan, transcript, name: $("name").value.trim(), email });
-    renderResults(r.card, r.mail, email, r.baseline || []);
-  } catch (e) {
-    $("d-loading").hidden = true;
-    $("d-error").hidden = false;
-    $("d-err").textContent = e.message;
+$("talk").onclick = async () => {
+  if (typing) {
+    const a = $("typed").value.trim();
+    if (!a) return;
+    $("typed").value = "";
+    answerResolve?.(a);
+    return;
   }
-}
-
-function el(tag, cls, text) {
-  const n = document.createElement(tag);
-  if (cls) n.className = cls;
-  if (text != null) n.textContent = text;
-  return n;
-}
-
-function criteria(list, scores) {
-  return list.map((c, i) => {
-    const s = scores[i] || {};
-    const box = el("div", "crit");
-    const head = el("div", "head");
-    head.append(el("b", null, c.name), scoreDots(s.score));
-    box.append(head);
-    if (s.comment) box.append(el("p", "comment", s.comment));
-    if (s.evidence) box.append(el("p", "evidence", `“${s.evidence}”`));
-    return box;
-  });
-}
-
-function scoreDots(score = 0) {
-  const dots = el("span", "dots");
-  dots.setAttribute("aria-label", `${score} out of 5`);
-  for (let k = 1; k <= 5; k++) dots.append(el("i", k <= score ? "on" : ""));
-  return dots;
-}
-
-function renderResults(card, mail, email, baseline) {
-  $("d-loading").hidden = true;
-  $("d-result").hidden = false;
-  $("d-role").textContent = plan.role + (plan.company ? ` · ${plan.company}` : "");
-  $("d-headline").textContent = card.headline;
-  $("d-summary").textContent = card.summary;
-
-  const arc = $("d-arc");
-  const c = 2 * Math.PI * 44;
-  arc.style.strokeDasharray = c;
-  arc.style.strokeDashoffset = c;
-  requestAnimationFrame(() => requestAnimationFrame(() => (arc.style.strokeDashoffset = c * (1 - card.overall / 10))));
-  // Count up to the score, ending on the exact value (it can have one decimal).
-  const start = performance.now();
-  const step = (now) => {
-    const t = Math.min(1, (now - start) / 1100);
-    const v = card.overall * (1 - Math.pow(1 - t, 3));
-    $("d-score").textContent = t < 1 ? Math.round(v) : String(card.overall);
-    if (t < 1) requestAnimationFrame(step);
-  };
-  requestAnimationFrame(step);
-
-  $("d-role-rubric").replaceChildren(...criteria(plan.rubric || [], card.role || []));
-  $("d-baseline").replaceChildren(...criteria(baseline, card.baseline || []));
-
-  $("d-mail").innerHTML = ICON.mail;
-  $("d-mail").append(
-    el("span", null, mail.sent ? `A copy is on its way to ${email}.` : `Not emailed: ${mail.reason} Screenshot this page to keep it.`)
-  );
-
-  const list = $("d-qs");
-  list.innerHTML = "";
-  plan.questions.forEach((q, i) => {
-    const s = card.questions[i] || {};
-    const box = el("div", "qcard");
-    const head = el("div", "head");
-    head.append(el("span", "tag", `Q${i + 1} · ${q.why}`));
-    head.append(scoreDots(s.score));
-    box.append(head, el("p", "q", q.ask));
-    box.append(s.quote ? el("blockquote", "quote", `“${s.quote}”`) : el("p", "muted", "No answer recorded."));
-    for (const [k, v] of [["Worked", s.strength], ["Improve", s.improve]]) {
-      if (!v) continue;
-      const row = el("p", "note");
-      row.append(el("b", null, k), el("span", null, v));
-      box.append(row);
-    }
-    list.append(box);
-  });
-
-  $("d-next").innerHTML = "";
-  (card.next_steps || []).forEach((s) => $("d-next").append(el("li", null, s)));
-}
-
-// ---------- Wire up ----------
-$("mic").onclick = async () => {
   if (!recording) {
     speechSynthesis?.cancel();
+    committed = "";
+    live = "";
+    captionYou("");
+    recording = true;
+    $("talk").classList.add("rec");
+    $("talk").innerHTML = ICON.stop;
+    status("Listening. Tap when you're done");
     try {
-      startRecording();
+      listen();
     } catch {
       setTyping(true);
     }
     return;
   }
-  setState("thinking");
-  lock(true, "");
-  const a = await stopRecording();
-  answerResolve?.(a);
+  lock(true);
+  status(`${person.name} is thinking`);
+  answerResolve?.(await stopRecording());
 };
-$("submit-typed").onclick = () => {
-  const a = $("typed").value.trim();
-  if (!a) return;
-  answerResolve?.(a);
-};
-$("toggle-type").onclick = async () => {
-  if (recording) {
-    $("typed").value = await stopRecording();
-    setState("idle");
-  }
+$("type").onclick = async () => {
+  if (recording) $("typed").value = await stopRecording();
   setTyping(!typing);
-  if (!$("mic").disabled) $("status").textContent = typing ? "Type your answer, then submit" : "Tap the mic when you're ready";
+  if (!$("talk").disabled) status(typing ? "Type your answer, then tap the arrow" : "Tap the mic to answer");
 };
 $("repeat").onclick = async () => {
   if (recording || !current) return;
-  setState("speaking");
-  lock(true, "");
-  await speak(current);
-  setState("idle");
-  lock(false, typing ? "Type your answer, then submit" : "Tap the mic when you're ready");
+  lock(true);
+  await say(current);
+  lock(false);
 };
-$("retry").onclick = finish;
 
-$("start").onclick = () => {
+// ---------- Shared controls ----------
+let endArmed = false;
+function endPressed() {
+  if (!endArmed) {
+    endArmed = true;
+    status("Tap end again to finish the interview");
+    setTimeout(() => (endArmed = false), 3000);
+    return;
+  }
+  hangUp();
+}
+$("end").onclick = endPressed;
+$("end2").onclick = endPressed;
+$("mute").onclick = () => {
+  if (!micTrack) return;
+  micTrack.enabled = !micTrack.enabled;
+  $("mute").classList.toggle("off", !micTrack.enabled);
+  $("mute").innerHTML = micTrack.enabled ? ICON.mic : ICON.micOff;
+  status(micTrack.enabled ? "Unmuted" : "You're muted");
+};
+$("cc").onclick = () => {
+  const off = $("captions").toggleAttribute("data-off");
+  $("cc").classList.toggle("off", off);
+};
+
+let media;
+function hangUp() {
+  if (ended) return;
+  ended = true;
+  clearInterval(clock);
+  try { pc?.close(); } catch {}
+  media?.getTracks().forEach((t) => t.stop());
+  speechSynthesis?.cancel();
+  player.pause();
+  if (recording) stopRecording();
+  answerResolve?.("");
+  finish();
+}
+
+async function getMedia(withCam) {
+  const audio = { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
+  try {
+    return await navigator.mediaDevices.getUserMedia({ audio, video: withCam ? { facingMode: "user", width: { ideal: 480 } } : false });
+  } catch (err) {
+    if (withCam) return getMedia(false);
+    throw err;
+  }
+}
+
+$("start").onclick = async () => {
   const email = $("email").value.trim();
   if (email && !EMAIL_RE.test(email)) {
     $("w-err").textContent = "That email doesn't look right.";
@@ -436,18 +502,145 @@ $("start").onclick = () => {
   }
   $("w-err").textContent = "";
   unlockAudio();
-  run();
+  try {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    audioCtx.resume();
+  } catch {}
+
+  show("interview");
+  window.scrollTo(0, 0);
+  status("Connecting");
+  captionThem("");
+  try {
+    media = await getMedia($("cam").checked);
+  } catch {
+    media = null;
+  }
+  if (media?.getVideoTracks().length) {
+    $("self").srcObject = new MediaStream(media.getVideoTracks());
+    $("self").hidden = false;
+  }
+  startClock();
+
+  if (media?.getAudioTracks().length) {
+    try {
+      await startLive(media);
+      return;
+    } catch (err) {
+      console.warn("Live voice unavailable, using tap-to-talk:", err.message);
+      try { pc?.close(); } catch {}
+      pc = dc = null;
+      media.getAudioTracks().forEach((t) => t.stop());
+    }
+  }
+  runClassic();
 };
 
+// ---------- Scorecard ----------
+async function finish() {
+  show("done");
+  window.scrollTo(0, 0);
+  $("d-loading").hidden = false;
+  $("d-error").hidden = true;
+  $("d-result").hidden = true;
+  const said = turns.filter((t) => t.text?.trim());
+  try {
+    const r = await post("/api/finish", { plan, turns: said, name: $("name").value.trim(), email: $("email").value.trim() });
+    renderResults(r.card, r.mail, r.baseline || []);
+  } catch (err) {
+    $("d-loading").hidden = true;
+    $("d-error").hidden = false;
+    $("d-err").textContent = err.message;
+  }
+}
+$("retry").onclick = finish;
+
+function meterEl(score = 0) {
+  const m = el("span", "meter");
+  m.setAttribute("aria-label", `${score} out of 5`);
+  for (let k = 1; k <= 5; k++) m.append(el("i", k <= score ? "on" : ""));
+  return m;
+}
+
+function criteria(list, scores) {
+  return list.map((c, i) => {
+    const s = scores[i] || {};
+    const box = el("div", "crit");
+    const h = el("div", "h");
+    h.append(el("b", null, c.name), meterEl(s.score));
+    box.append(h);
+    if (s.evidence) box.append(el("p", "ev", `“${s.evidence}”`));
+    if (s.comment) box.append(el("p", null, s.comment));
+    return box;
+  });
+}
+
+function renderResults(card, mail, baseline) {
+  $("d-loading").hidden = true;
+  $("d-result").hidden = false;
+  $("d-role").textContent = `Scorecard · ${plan.role} at ${plan.company}`;
+  $("d-headline").textContent = card.headline;
+  $("d-summary").textContent = card.summary;
+  const email = $("email").value.trim();
+  $("d-mail").textContent = mail.sent
+    ? `A copy is on its way to ${email}.`
+    : `Not emailed: ${String(mail.reason || "").replace(/\.$/, "")}. Screenshot this page to keep it.`;
+
+  // Count up to the score, ending on the exact value (it can have one decimal).
+  const t0 = performance.now();
+  const step = (now) => {
+    const t = Math.min(1, (now - t0) / 1100);
+    $("d-score").textContent = t < 1 ? Math.round(card.overall * (1 - (1 - t) ** 3)) : String(card.overall);
+    if (t < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+
+  $("d-role-rubric").replaceChildren(...criteria(plan.rubric || [], card.role || []));
+  $("d-baseline").replaceChildren(...criteria(baseline, card.baseline || []));
+
+  $("d-qs").replaceChildren(
+    ...plan.questions.map((x, i) => {
+      const s = card.questions[i] || {};
+      const d = el("details", "ans");
+      const sum = el("summary");
+      sum.append(el("span", "q", x.ask), meterEl(s.score), el("span", "t", `Q${i + 1} · ${x.why}`));
+      const body = el("div", "body");
+      body.append(s.quote ? el("blockquote", null, s.quote) : el("p", "muted", "No answer recorded."));
+      for (const [k, v] of [["Worked", s.strength], ["Improve", s.improve]]) {
+        if (!v) continue;
+        const row = el("p", "kv");
+        row.append(el("b", null, k), el("span", null, v));
+        body.append(row);
+      }
+      d.append(sum, body);
+      return d;
+    })
+  );
+  $("d-next").replaceChildren(...(card.next_steps || []).map((s) => el("li", null, s)));
+  $("again").href = location.href;
+}
+
+// ---------- Lobby ----------
 function renderPrep() {
   const p = plan.prep;
   if (!p) return;
   $("prep").hidden = false;
-  $("p-about").textContent = p.about;
-  $("p-looks").replaceChildren(...(p.looks_for || []).map((t) => el("li", null, t)));
-  $("p-prepare").replaceChildren(...(p.prepare || []).map((t) => el("li", null, t)));
-  $("p-tips").replaceChildren(...(p.tips || []).map((t) => el("li", null, t)));
-  $("p-rubric").replaceChildren(...(plan.rubric || []).map((c) => el("span", "chip", c.name)));
+  const lists = {
+    about: () => [el("p", "about", p.about)],
+    looks: () => [el("ul", null)].map((ul) => (ul.append(...(p.looks_for || []).map((t) => el("li", null, t))), ul)),
+    prepare: () => [el("ul", null)].map((ul) => (ul.append(...(p.prepare || []).map((t) => el("li", null, t))), ul)),
+    tips: () => [el("ul", null)].map((ul) => (ul.append(...(p.tips || []).map((t) => el("li", null, t))), ul)),
+    rubric: () =>
+      [el("ul", null)].map(
+        (ul) => (ul.append(...(plan.rubric || []).map((c) => el("li", null, `${c.name}: ${c.strong}`))), ul)
+      ),
+  };
+  const pick = (tab) => {
+    $("tabs").querySelectorAll("button").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.tab === tab)));
+    $("panel").replaceChildren(...lists[tab]());
+  };
+  $("tabs").querySelectorAll("button").forEach((b) => (b.onclick = () => pick(b.dataset.tab)));
+  pick("about");
 }
 
 async function load() {
@@ -463,17 +656,23 @@ async function load() {
     }
     if (!plan?.questions?.length) throw new Error("This link is missing its interview.");
   } catch (e) {
-    $("w-title").textContent = "This link doesn't work";
-    $("w-meta").replaceChildren(el("span", "muted", e.message || "Ask whoever sent it for a fresh link."));
+    $("w-title").textContent = "This link doesn't work.";
+    $("w-sub").textContent = e.message || "Ask whoever sent it for a fresh link.";
+    $("portrait").hidden = true;
     return;
   }
-  document.title = `Mock interview: ${plan.role}${plan.company ? ` at ${plan.company}` : ""}`;
-  $("w-title").textContent = plan.role;
-  const chips = [plan.company, `${plan.questions.length} questions`, `About ${plan.questions.length * 2} min`, "Voice"].filter(Boolean);
-  $("w-meta").replaceChildren(...chips.map((c) => el("span", "chip", c)));
+  person = interviewerFor(plan);
+  document.title = `Interview: ${plan.role} at ${plan.company}`;
+  $("portrait").prepend(face(person, 900));
+  $("w-who").textContent = `${person.name} is ready`;
+  $("w-kicker").textContent = `Mock interview · ${plan.company}`;
+  $("w-title").replaceChildren(document.createTextNode(plan.role + " "), el("em", null, `at ${plan.company}`));
+  $("w-sub").textContent = `With ${person.name} · ${plan.questions.length} questions · about ${plan.questions.length * 2} minutes`;
+  $("tile-face").replaceChildren(face(person, 1000, 1400));
+  $("tile-name").textContent = `${person.name} · ${plan.company}`;
+  $("d-face").replaceChildren(face(person, 200));
+  $("d-loading-title").textContent = `${person.name} is writing up your scorecard`;
   renderPrep();
   $("start").disabled = false;
-  if (!Recognition)
-    $("w-note").textContent = "This browser can't transcribe speech, so you'll type your answers. For voice, use Safari on iPhone or Chrome on Android.";
 }
 load();

@@ -6,6 +6,7 @@
     "api/turn.js": { "maxDuration": 60 },
     "api/finish.js": { "maxDuration": 120 },
     "api/speak.js": { "maxDuration": 30 },
+    "api/realtime.js": { "maxDuration": 15 },
     "api/plan.js": { "maxDuration": 10 }
   }
 }
