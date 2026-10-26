@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Mock Interview Link</title>
+  <meta name="description" content="Paste a job posting, share a link, and get interviewed out loud on your phone." />
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+<main>
+  <div class="eyebrow">Mock Interview Link</div>
+  <h1>Turn any job posting into a spoken mock interview</h1>
+  <p class="muted">Paste the posting, get a link. Whoever opens it on their phone gets interviewed out loud with questions from this posting, plus follow-ups, then gets a scorecard by email.</p>
+
+  <section id="create" class="card">
+    <label for="posting">Job posting</label>
+    <textarea id="posting" placeholder="Paste the full job description here: title, responsibilities, requirements..."></textarea>
+    <label for="count">Number of questions</label>
+    <select id="count">
+      <option value="3">3 questions (about 5 minutes)</option>
+      <option value="5" selected>5 questions (about 10 minutes)</option>
+      <option value="7">7 questions (about 15 minutes)</option>
+    </select>
+    <p class="error" id="err"></p>
+    <button id="go">Create interview link</button>
+  </section>
+
+  <section id="result" class="card hidden">
+    <div class="eyebrow" id="r-demo"></div>
+    <h2 id="r-title"></h2>
+    <p class="muted small">Scan or share this link. It works in any phone browser, no app needed.</p>
+    <div id="qr"></div>
+    <div class="share-url" id="url"></div>
+    <div class="row" style="margin-top:12px">
+      <button id="copy">Copy link</button>
+      <button id="open" class="secondary">Open it</button>
+    </div>
+    <details style="margin-top:16px">
+      <summary class="muted">Preview the questions</summary>
+      <ol class="qlist" id="qs"></ol>
+    </details>
+    <button class="link" id="again">Make another</button>
+  </section>
+</main>
+<script type="module">
+  import { encodePlan, post } from "/share.js";
+  import qrcode from "/vendor/qrcode.js";
+  const $ = (id) => document.getElementById(id);
+
+  $("go").onclick = async () => {
+    $("err").textContent = "";
+    $("go").disabled = true;
+    $("go").innerHTML = 'Reading the posting<span class="dots"></span>';
+    try {
+      const { plan, id } = await post("/api/create", { posting: $("posting").value, count: $("count").value });
+      const url = id ? `${location.origin}/i?id=${id}` : `${location.origin}/i#${encodePlan(plan)}`;
+      $("r-title").textContent = plan.role + (plan.company ? ` · ${plan.company}` : "");
+      $("r-demo").textContent = plan.demo ? "Demo mode: no API key on the server yet" : "Your interview is ready";
+      $("url").textContent = url;
+      $("qs").innerHTML = "";
+      plan.questions.forEach((q) => {
+        const li = document.createElement("li");
+        li.innerHTML = `<div></div><div class="why"></div>`;
+        li.children[0].textContent = q.ask;
+        li.children[1].textContent = `Tests: ${q.why}`;
+        $("qs").append(li);
+      });
+      try {
+        const qr = qrcode(0, "L");
+        qr.addData(url);
+        qr.make();
+        $("qr").innerHTML = qr.createSvgTag({ cellSize: 4, margin: 4, scalable: true });
+      } catch {
+        $("qr").innerHTML = '<p class="muted small">This link is too long for a QR code. Connect a database for short links (see README).</p>';
+      }
+      $("copy").textContent = navigator.share ? "Share link" : "Copy link";
+      $("open").onclick = () => window.open(url, "_blank");
+      $("copy").onclick = async () => {
+        if (navigator.share) return navigator.share({ title: "Mock interview", url }).catch(() => {});
+        await navigator.clipboard.writeText(url);
+        $("copy").textContent = "Copied!";
+        setTimeout(() => ($("copy").textContent = "Copy link"), 1500);
+      };
+      $("create").classList.add("hidden");
+      $("result").classList.remove("hidden");
+    } catch (e) {
+      $("err").textContent = e.message;
+    } finally {
+      $("go").disabled = false;
+      $("go").textContent = "Create interview link";
+    }
+  };
+  $("again").onclick = () => {
+    $("result").classList.add("hidden");
+    $("create").classList.remove("hidden");
+  };
+</script>
+</body>
+</html>

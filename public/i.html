@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Mock Interview</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+<main>
+  <!-- 1. Welcome -->
+  <section id="welcome">
+    <div class="eyebrow">Mock interview</div>
+    <h1 id="w-title">Loading<span class="dots"></span></h1>
+    <p class="muted" id="w-sub"></p>
+    <div class="card">
+      <p>The interviewer will ask each question out loud. Tap the mic to answer, then tap again when you're done. Expect a follow-up or two. Find a quiet spot and turn your volume up.</p>
+      <label for="name">Your first name</label>
+      <input id="name" autocomplete="given-name" placeholder="Alex" />
+      <label for="email">Email for your scorecard</label>
+      <input id="email" type="email" autocomplete="email" inputmode="email" placeholder="you@example.com" />
+      <p class="error" id="w-err"></p>
+      <button id="start" disabled>Start interview</button>
+      <p class="muted small" id="w-note"></p>
+    </div>
+  </section>
+
+  <!-- 2. Interview -->
+  <section id="interview" class="stage hidden">
+    <div class="progress" id="progress"></div>
+    <div class="eyebrow" id="q-label"></div>
+    <div class="question" id="q-text"></div>
+    <div class="transcript" id="answer" aria-live="polite"></div>
+    <textarea id="typed" class="hidden" placeholder="Type your answer..."></textarea>
+    <div class="status" id="status"></div>
+    <button class="mic" id="mic" aria-label="Answer">🎤</button>
+    <button id="submit-typed" class="hidden">Submit answer</button>
+    <div class="row">
+      <button class="link" id="repeat">Repeat question</button>
+      <button class="link" id="toggle-type">Type instead</button>
+    </div>
+  </section>
+
+  <!-- 3. Results -->
+  <section id="done" class="hidden">
+    <div class="eyebrow">Interview complete</div>
+    <h1 id="d-title">Scoring your answers<span class="dots"></span></h1>
+    <p class="muted" id="d-mail"></p>
+    <p class="error" id="d-err"></p>
+    <button id="retry" class="hidden">Try scoring again</button>
+    <iframe id="scorecard" class="score-frame hidden" title="Scorecard"></iframe>
+  </section>
+</main>
+<script type="module" src="/interview.js"></script>
+</body>
+</html>
