@@ -1,10 +1,11 @@
 // Entry point for the one-page app: build an interview, share it, then hand off to the lobby.
-import { initTheme, INTERVIEWERS, face, encodePlan, post, el, show } from "/ui.js";
+import { initTheme, initClock, INTERVIEWERS, face, encodePlan, post, el, show } from "/ui.js";
 import { openLobby, loadFromLink } from "/interview.js";
 import qrcode from "/vendor/qrcode.js";
 
 const $ = (id) => document.getElementById(id);
 initTheme();
+initClock();
 
 // A shared link (/i/<id>, /i#<plan> or ?id=) opens straight into the lobby.
 if (/^\/i(\/|$)/.test(location.pathname) || new URLSearchParams(location.search).has("id")) loadFromLink();
@@ -39,7 +40,14 @@ $("who").replaceChildren(
     return b;
   })
 );
-chips($("who"), (v) => (interviewer = v));
+// The hero shows whoever will interview you.
+function hero(id) {
+  const p = INTERVIEWERS[id];
+  $("hero-photo").replaceChildren(face(p, 1600, 1200));
+  $("hero-who").textContent = `${p.name} is ready to interview you`;
+}
+hero(interviewer);
+chips($("who"), (v) => hero((interviewer = v)));
 
 if (navigator.clipboard?.readText) {
   $("paste").hidden = false;

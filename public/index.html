@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Mock Interview</title>
   <meta name="description" content="Rehearse the real interview: a spoken mock interview built from any job posting, graded against a researched rubric." />
-  <meta name="theme-color" content="#f2eee6" />
+  <meta name="theme-color" content="#121212" />
   <link rel="icon" type="image/png" href="/favicon.png" />
   <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
   <meta property="og:type" content="website" />
@@ -16,7 +16,7 @@
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
   <meta name="twitter:card" content="summary_large_image" />
-  <script>(function(){var t;try{t=localStorage.getItem("theme")}catch(e){}var d=document.documentElement;if(t)d.dataset.theme=t;if(t==="dark"||(!t&&matchMedia("(prefers-color-scheme: dark)").matches))d.dataset.dark=""})()</script>
+  <script>(function(){var t;try{t=localStorage.getItem("theme")}catch(e){}var d=document.documentElement;if(t)d.dataset.theme=t;if(t!=="light")d.dataset.dark=""})()</script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -26,7 +26,8 @@
 <!-- One page, four steps: build → lobby (share + prep + join) → call → scorecard -->
 <main class="page">
   <header class="bar">
-    <a class="logo" href="/">Mock <i>Interview</i></a>
+    <a class="logo" href="/"><span class="mark"></span>Mock Interview</a>
+    <span class="clock" id="clock"></span>
     <button class="theme" aria-label="Dark mode">
       <span class="knob">
         <svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
@@ -37,46 +38,133 @@
 
   <!-- 1. Build -->
   <section id="create" class="fade" hidden>
-    <p class="kicker">Voice mock interviews · <b>graded</b></p>
-    <h1 class="display">Rehearse the <em>real</em> interview.</h1>
-    <p class="sub">Paste a job. Practice out loud with an interviewer who listens, then get a scorecard.</p>
-
-    <div class="faces">
-      <div class="stack" id="faces"></div>
-      <p>Maya and Daniel interview you out loud,<br />then send you a scorecard.</p>
-    </div>
-
-    <form class="sheet" id="form" autocomplete="off">
-      <label class="line"><span class="n">01</span><span class="l">Company</span><input id="company" placeholder="Stripe" autocomplete="organization" /></label>
-      <label class="line"><span class="n">02</span><span class="l">Position</span><input id="position" placeholder="Software Engineering Intern" /></label>
-      <label class="line">
-        <span class="n">03</span><span class="l">Job description</span>
-        <textarea id="posting" placeholder="Paste the full posting: what you'd do, what they're looking for."></textarea>
-        <span class="hint"><span id="words">0 words</span><button class="paste" id="paste" type="button" hidden>Paste</button></span>
-      </label>
-
-      <div class="opts">
-        <div class="opt">
-          <span class="l">Questions</span>
-          <div class="chips" role="radiogroup" id="count">
-            <button type="button" class="chip-btn" role="radio" aria-checked="false" data-v="3">3</button>
-            <button type="button" class="chip-btn" role="radio" aria-checked="true" data-v="5">5</button>
-            <button type="button" class="chip-btn" role="radio" aria-checked="false" data-v="7">7</button>
-          </div>
-        </div>
-        <div class="opt">
-          <span class="l">Interviewer</span>
-          <div class="chips" role="radiogroup" id="who"></div>
+    <div class="hero">
+      <div class="hero-photo" id="hero-photo"></div>
+      <div class="hero-shade"></div>
+      <span class="tag hero-tag"><span class="dot"></span><span id="hero-who">Your interviewer is ready</span></span>
+      <div class="hero-copy">
+        <h1 class="display">Mock interviews: practice the real one out loud<b class="stop">.</b></h1>
+        <p class="sub">Paste any job posting and get a link. An interviewer asks real questions out loud, follows up when you're vague, and grades you with your own words.</p>
+        <div class="hero-row">
+          <a class="btn" href="#build"><span>Build my interview</span><span class="arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></a>
+          <span class="badge"><span class="stack" id="faces"></span><span>Free · No app · Any phone</span></span>
         </div>
       </div>
+    </div>
 
-      <button class="cta" id="go" type="submit">
-        <span id="go-label">Build my interview</span>
-        <span class="arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
-      </button>
-      <p class="working" id="note"></p>
-      <p class="error" id="err"></p>
-    </form>
+    <div class="section">
+      <p class="label"><span>/ 01</span>What you get</p>
+      <div class="stats">
+        <div><b>1</b><span>link you can send to anyone</span></div>
+        <div><b>0</b><span>apps to install</span></div>
+        <div><b>~10</b><span>minutes, spoken out loud</span></div>
+        <div><b>9</b><span>criteria on your scorecard</span></div>
+      </div>
+    </div>
+
+    <div class="section narrow" id="build">
+      <p class="label"><span>/ 02</span>Build your interview</p>
+      <h2 class="title">Tell us about the job<b class="stop">.</b></h2>
+      <p class="sub">We research the company, then write questions, a prep sheet and a rubric for this exact role.</p>
+      <form class="sheet" id="form" autocomplete="off">
+        <label class="line"><span class="l">Company</span><input id="company" placeholder="Stripe" autocomplete="organization" /></label>
+        <label class="line"><span class="l">Position</span><input id="position" placeholder="Software Engineering Intern" /></label>
+        <label class="line">
+          <span class="l">Job description</span>
+          <textarea id="posting" placeholder="Paste the full posting: what you'd do, what they're looking for."></textarea>
+          <span class="hint"><span id="words">0 words</span><button class="paste" id="paste" type="button" hidden>Paste</button></span>
+        </label>
+
+        <div class="opts">
+          <div class="opt">
+            <span class="l">Questions</span>
+            <div class="chips" role="radiogroup" id="count">
+              <button type="button" class="chip-btn" role="radio" aria-checked="false" data-v="3">3</button>
+              <button type="button" class="chip-btn" role="radio" aria-checked="true" data-v="5">5</button>
+              <button type="button" class="chip-btn" role="radio" aria-checked="false" data-v="7">7</button>
+            </div>
+          </div>
+          <div class="opt">
+            <span class="l">Interviewer</span>
+            <div class="chips" role="radiogroup" id="who"></div>
+          </div>
+        </div>
+
+        <button class="cta" id="go" type="submit">
+          <span id="go-label">Build my interview</span>
+          <span class="arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+        </button>
+        <p class="working" id="note"></p>
+        <p class="error" id="err"></p>
+      </form>
+    </div>
+
+    <div class="section" id="how">
+      <p class="label"><span>/ 03</span>How it works</p>
+      <h2 class="title">From job posting to scorecard in four steps<b class="stop">.</b></h2>
+      <div class="cards">
+        <article class="card">
+          <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></span>
+          <h3>Research the company</h3>
+          <p>Paste the posting. We read the web for the company's values, interview process and recent news.</p>
+        </article>
+        <article class="card">
+          <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg></span>
+          <h3>Read your prep sheet</h3>
+          <p>What they look for, how they interview, facts worth knowing and sharp questions to ask them.</p>
+        </article>
+        <article class="card">
+          <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 17v4"/></svg></span>
+          <h3>Talk it out</h3>
+          <p>Your interviewer asks out loud and follows up when an answer is vague. It runs in your phone's browser.</p>
+        </article>
+        <article class="card">
+          <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></span>
+          <h3>Get your scorecard</h3>
+          <p>Scored 1 to 5 on nine criteria, quoting your own answers, with exactly what to practice next.</p>
+        </article>
+      </div>
+    </div>
+
+    <div class="section">
+      <p class="label"><span>/ 04</span>Why practice out loud</p>
+      <h2 class="title">Reading answers isn't rehearsing them<b class="stop">.</b></h2>
+      <div class="compare">
+        <div class="col">
+          <h3>Practicing alone</h3>
+          <ul>
+            <li>Generic question lists that could be for any job</li>
+            <li>Nobody pushes back when an answer is vague</li>
+            <li>You never hear how you actually sound</li>
+            <li>No clear idea of what to fix</li>
+          </ul>
+        </div>
+        <div class="col ours">
+          <h3><span class="mark"></span>Mock Interview</h3>
+          <ul>
+            <li>Questions built from your posting and the company's research</li>
+            <li>Follow-up questions when you stay vague</li>
+            <li>Spoken out loud, like the real call</li>
+            <li>A scorecard with your quotes and next steps</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="banner">
+      <p class="label"><span>/ 05</span>Ready when you are</p>
+      <h2 class="title">Your next interview starts with a link<b class="stop">.</b></h2>
+      <a class="btn" href="#build"><span>Build my interview</span><span class="arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></a>
+    </div>
+
+    <footer class="foot">
+      <div>
+        <a class="logo" href="/"><span class="mark"></span>Mock Interview</a>
+        <p>Practice out loud for the job you want. Built for UGA Create Club.</p>
+      </div>
+      <nav><a href="#build">Build an interview</a><a href="#how">How it works</a></nav>
+      <p class="small">We don't save recordings or transcripts. Answers go to an AI service (Google, Anthropic or OpenAI) only to run and grade the interview.</p>
+    </footer>
   </section>
 
   <!-- 2. Lobby: share link (for whoever built it), prep sheet, join -->
@@ -103,8 +191,8 @@
     <div class="prep" id="prep"></div>
 
     <div class="join">
-      <label class="line"><span class="n">01</span><span class="l">Your first name</span><input id="name" autocomplete="given-name" placeholder="Alex" /></label>
-      <label class="line"><span class="n">02</span><span class="l">Email for your scorecard</span><input id="email" type="email" autocomplete="email" inputmode="email" placeholder="you@example.com" /></label>
+      <label class="line"><span class="l">Your first name</span><input id="name" autocomplete="given-name" placeholder="Alex" /></label>
+      <label class="line"><span class="l">Email for your scorecard</span><input id="email" type="email" autocomplete="email" inputmode="email" placeholder="you@example.com" /></label>
       <label class="check"><input type="checkbox" id="cam" checked /> Show my camera so it feels like a real call. Only you see it, nothing is recorded.</label>
       <p class="error" id="w-err"></p>
       <p class="fine privacy">We don't save recordings or transcripts. Your answers are sent to an AI service (Google, Anthropic or OpenAI) only to run and grade the interview.</p>
@@ -113,7 +201,7 @@
     <div class="sticky">
       <button class="cta" id="start" disabled>
         <span>Join interview</span>
-        <span class="arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+        <span class="arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
       </button>
       <p class="fine" id="w-note">Headphones help. Talk naturally; you can interrupt.</p>
     </div>
