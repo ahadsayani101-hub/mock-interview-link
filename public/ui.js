@@ -10,7 +10,7 @@ export function initTheme() {
   const apply = (dark) => {
     if (dark) root.dataset.dark = "";
     else delete root.dataset.dark;
-    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", dark ? "#000000" : "#f2eee6");
+    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", dark ? "#121212" : "#f5f5f1");
     buttons.forEach((b) => b.setAttribute("aria-pressed", String(dark)));
   };
   apply("dark" in root.dataset);
@@ -22,9 +22,17 @@ export function initTheme() {
       apply(dark);
     })
   );
-  matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", (e) => {
-    if (!root.dataset.theme) apply(e.matches);
-  });
+}
+
+// Local time in the top bar, like a front desk clock: "New York 5:14 PM".
+export function initClock() {
+  const box = document.getElementById("clock");
+  if (!box) return;
+  const zone = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
+  const city = zone.includes("/") ? zone.split("/").pop().replace(/_/g, " ") : "";
+  const tick = () => (box.textContent = `${city} ${new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`.trim());
+  tick();
+  setInterval(tick, 15000);
 }
 
 // ---------- Interviewers ----------
