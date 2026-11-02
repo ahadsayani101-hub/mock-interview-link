@@ -3,6 +3,7 @@ import { interviewerFor, face, decodePlan, post, el, show } from "/ui.js";
 
 const $ = (id) => document.getElementById(id);
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const MAX_CALL_MIN = 25;
 
 const ICON = {
   mic: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 17v4"/></svg>',
@@ -520,6 +521,13 @@ $("start").onclick = async () => {
     $("self").hidden = false;
   }
   startClock();
+  // A hard stop so a forgotten call doesn't run (and bill) forever.
+  setTimeout(() => {
+    if (!ended) {
+      status("Time's up. Wrapping up");
+      hangUp();
+    }
+  }, MAX_CALL_MIN * 60e3);
 
   if (media?.getAudioTracks().length) {
     try {

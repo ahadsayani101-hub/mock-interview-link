@@ -21,6 +21,13 @@ Built for the UGA Create Club challenge (Option E).
 No app install: works in Safari on iPhone and Chrome on Android. Light and dark themes
 (toggle in the top corner). Interviewer photos are stock images from Unsplash.
 
+## Going public
+
+- **Usage limits** (`lib/store.js`, `overLimit`): each API route caps calls per visitor per hour and for the whole site per day, so a shared link can't run up the bill. Limits are generous per visitor because a classroom on one Wi-Fi shares an address. They need the Upstash database; without it nothing is limited.
+- Live calls end on their own after 25 minutes.
+- Also set a monthly budget in the OpenAI and Anthropic dashboards as a hard stop.
+- Link previews use `public/og.png`; icons are `public/favicon.png` and `public/apple-touch-icon.png`.
+
 ## Run locally
 
 ```bash

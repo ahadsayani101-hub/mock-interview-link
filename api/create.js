@@ -17,4 +17,4 @@ export default route(async ({ company, position, posting, count, interviewer }) 
   plan.interviewer = pickInterviewer(interviewer);
   const id = hasStore() ? await savePlan(plan) : null;
   return { plan, id, baseline: BASELINE };
-});
+}, { name: "create", perHour: 30, perDay: 300 });

@@ -151,6 +151,7 @@ details.more[open] summary::after { content: " −"; }
 .check input:checked::after { transform: translateX(16px); }
 .sticky { position: sticky; bottom: 0; z-index: 2; margin: 0 -20px; padding: 14px 20px max(14px, env(safe-area-inset-bottom)); background: linear-gradient(to top, var(--bg) 72%, transparent); }
 .fine { text-align: center; font: 12px var(--mono); color: var(--muted); margin: 10px 0 0; }
+.privacy { text-align: left; line-height: 1.6; margin: 6px 0 0; }
 
 /* ---------- Call (always dark) ---------- */
 .call {

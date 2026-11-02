@@ -1,4 +1,4 @@
-import { readJson, send } from "../lib/http.js";
+import { readJson, send, limit } from "../lib/http.js";
 import { interviewer } from "../lib/interviewers.js";
 
 // Natural interviewer voice. Uses OpenAI if OPENAI_API_KEY is set, else ElevenLabs if
@@ -36,6 +36,7 @@ export default async function handler(req, res) {
   const provider = process.env.OPENAI_API_KEY ? openai : process.env.ELEVENLABS_API_KEY ? elevenlabs : null;
   if (!provider) return send(res, 501, { error: "No voice provider configured" });
   try {
+    await limit(req, "speak", { perHour: 600, perDay: 6000 });
     const { text, voice } = await readJson(req);
     const input = String(text || "").trim().slice(0, 600);
     if (!input) return send(res, 400, { error: "No text" });
@@ -50,6 +51,6 @@ export default async function handler(req, res) {
     res.end(Buffer.from(await r.arrayBuffer()));
   } catch (err) {
     console.error(err);
-    send(res, 500, { error: "Voice failed" });
+    send(res, err.expose ? err.status : 500, { error: err.expose ? err.message : "Voice failed" });
   }
 }

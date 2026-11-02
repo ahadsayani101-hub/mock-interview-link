@@ -58,7 +58,7 @@ $("posting").oninput = () => {
 let timer;
 function working(company) {
   const steps = [
-    `Researching ${company}`,
+    `Researching ${company}. This takes a minute or two`,
     "Reading the job description",
     "Finding what interviewers look for",
     "Building your rubric",

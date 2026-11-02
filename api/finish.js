@@ -24,4 +24,4 @@ export default route(async ({ plan, turns, name, email }) => {
     }
   }
   return { card, html, mail, baseline: BASELINE };
-});
+}, { name: "finish", perHour: 40, perDay: 400 });
