@@ -282,3 +282,12 @@ body { letter-spacing: -0.011em; }
   .display { font-size: 60px; }
   .display.md { font-size: 42px; }
 }
+
+/* ---------- Researched prep: bold leads and research notes ---------- */
+.dash li { line-height: 1.5; }
+.dash li b { display: block; font-weight: 600; color: var(--ink); margin-bottom: 2px; }
+.dash li b + span { color: var(--muted); }
+.notes { padding: 4px 0 8px; }
+.notes h3 { font: 600 14px/1.3 var(--sans); letter-spacing: -0.01em; margin: 22px 0 2px; color: var(--ink); }
+.notes h3:first-child { margin-top: 12px; }
+.notes .dash li { font-size: 14px; padding: 9px 0; color: var(--muted); }

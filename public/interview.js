@@ -205,7 +205,9 @@ function fetchAudio(text) {
       text,
       fetch("/api/speak", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text, voice: plan.interviewer }) })
         .then(async (r) => {
-          if (r.status === 501) cloudVoice = false;
+          // No voice service, or it's out of free quota: use the phone's voice from here on,
+          // so the interviewer doesn't switch voices mid-call.
+          if (r.status === 501 || r.status === 429) cloudVoice = false;
           return r.ok ? URL.createObjectURL(await r.blob()) : null;
         })
         .catch(() => null)
@@ -369,8 +371,11 @@ async function runClassic() {
   setTyping(typing);
   const name = $("name").value.trim();
   const greeting = `Hi${name ? " " + name : ""}, I'm ${person.name}. Thanks for making the time. Let's dive in.`;
-  fetchAudio(greeting);
-  plan.questions.forEach((x) => fetchAudio(x.ask));
+  // Fetch the voice clips one at a time, in the order they're needed (free voice plans
+  // allow only a few requests at once).
+  (async () => {
+    for (const t of [greeting, ...plan.questions.map((x) => x.ask)]) if (!(await fetchAudio(t)) && !cloudVoice) break;
+  })();
   await say(greeting);
 
   for (let i = 0; i < plan.questions.length && !ended; i++) {
@@ -634,10 +639,41 @@ function heading(title, note) {
   return h;
 }
 
+// "Lead: detail" bullets show the lead in bold.
 function bullets(items) {
   const ul = el("ul", "dash");
-  ul.append(...items.map((t) => el("li", null, t)));
+  ul.append(
+    ...items.map((raw) => {
+      const t = String(raw).replace(/\*\*/g, "").trim();
+      const li = el("li");
+      const body = el("span"); // one flex item, so the bold lead flows with its text
+      const i = t.indexOf(": ");
+      if (i > 1 && i < 70 && t.slice(0, i).split(" ").length <= 8) body.append(el("b", null, t.slice(0, i)), el("span", null, t[i + 2].toUpperCase() + t.slice(i + 3)));
+      else body.textContent = t;
+      li.append(body);
+      return li;
+    })
+  );
   return ul;
+}
+
+// The research brief as headings and bullets.
+function notes(text) {
+  const box = el("div", "notes");
+  let ul;
+  for (const raw of text.split("\n")) {
+    const line = raw.replace(/\*\*/g, "").replace(/^#+\s*/, "").trim();
+    if (!line) continue;
+    const item = line.match(/^[-*•]\s+(.*)/);
+    if (item) {
+      if (!ul) box.append((ul = el("ul", "dash")));
+      ul.append(el("li", null, item[1]));
+    } else {
+      ul = null;
+      box.append(el("h3", null, line.replace(/:$/, "")));
+    }
+  }
+  return box;
 }
 
 function numbered(rows) {
@@ -662,9 +698,13 @@ function renderPrep(baseline, creator) {
   const p = plan.prep || {};
   const out = [];
   if (p.about) out.push(heading("The role"), el("p", "about", p.about));
-  if (p.looks_for?.length) out.push(heading("What they look for"), bullets(p.looks_for));
-  if (p.prepare?.length) out.push(heading("How to prepare"), bullets(p.prepare));
-  if (p.tips?.length) out.push(heading("Tips for the call"), bullets(p.tips));
+  const section = (title, items) => items?.length && out.push(heading(title), bullets(items));
+  section("What they look for", p.looks_for);
+  section("Their interview process", p.process);
+  section("Know before you go", p.know);
+  section("How to prepare", p.prepare);
+  section("Smart questions to ask them", p.ask_them);
+  section("Tips for the call", p.tips);
   out.push(
     heading("Graded on", plan.research ? "From the posting + research" : "From the posting"),
     numbered((plan.rubric || []).map((c) => [c.name, c.strong, creator ? c.source : ""]))
@@ -688,6 +728,7 @@ function renderPrep(baseline, creator) {
     );
     out.push(more("Research sources", ul));
   }
+  if (creator && plan.research) out.push(more("Full research notes", notes(plan.research)));
   if (creator) out.push(more("The questions (spoilers if you're taking it yourself)", numbered(plan.questions.map((x) => [x.ask, "", x.why]))));
   $("prep").replaceChildren(...out);
 }
@@ -700,7 +741,7 @@ export function openLobby(p, { baseline, creator = false } = {}) {
   $("portrait").querySelector(".face, .mono-face")?.remove();
   $("portrait").prepend(face(person, 900));
   $("w-who").textContent = `${person.name} is ready`;
-  if (creator) $("w-kicker").innerHTML = plan.demo ? "Demo mode · <b>add an API key for real research</b>" : "Ready · <b>start now or share the link</b>";
+  if (creator) $("w-kicker").innerHTML = plan.demo ? "Demo mode · <b>add a free Gemini key for real research</b>" : "Ready · <b>start now or share the link</b>";
   else $("w-kicker").textContent = `Mock interview · ${plan.company}`;
   $("w-title").replaceChildren(document.createTextNode(plan.role + " "), el("em", null, `at ${plan.company}`));
   $("w-sub").textContent = `With ${person.name} · ${plan.questions.length} questions · about ${plan.questions.length * 2} minutes`;
