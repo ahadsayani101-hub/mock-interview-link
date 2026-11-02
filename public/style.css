@@ -12,9 +12,9 @@
   --good: #2f6b4f;
   --btn: #161513;
   --btn-ink: #faf8f3;
-  --serif: "Instrument Serif", "Iowan Old Style", Georgia, serif;
-  --sans: "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --serif: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --mono: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
@@ -242,4 +242,43 @@ details.ans blockquote::after { content: "”"; color: var(--accent); }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition: none !important; }
+}
+
+/* ---------- Clean pass: one typeface, fewer labels, more air ---------- */
+body { letter-spacing: -0.011em; }
+.logo { font: 650 19px/1 var(--sans); letter-spacing: -0.03em; }
+.logo i { font-style: normal; }
+.kicker { font: 500 14px/1.2 var(--sans); letter-spacing: -0.01em; text-transform: none; margin-bottom: 14px; }
+.display { font: 650 44px/1.04 var(--sans); letter-spacing: -0.045em; }
+.display em { font-style: normal; }
+.display.md { font-size: 32px; letter-spacing: -0.04em; }
+.sub { font-size: 17px; color: var(--muted); }
+.sec { font: 600 15px/1 var(--sans); letter-spacing: -0.015em; text-transform: none; color: var(--ink); border-bottom-color: var(--line); margin-top: 40px; }
+.sec span { font-weight: 400; color: var(--muted); }
+.faces { margin: 22px 0 0; }
+.sheet { border-top: 0; margin-top: 28px; }
+.line { grid-template-columns: 1fr; padding: 16px 0 12px; }
+.line .n { display: none; }
+.line .l, .opt .l { font: 500 13px var(--sans); letter-spacing: -0.005em; text-transform: none; }
+.line input, .line textarea, .line .hint { grid-column: 1; }
+.line input { font-size: 19px; letter-spacing: -0.02em; }
+.line .hint, .paste { font: 500 12px var(--sans); }
+.cta { font-weight: 600; letter-spacing: -0.02em; }
+.working, .fine, .text-btn, .mailnote, .copied, .link-text, .ticket-body .l, .call-top, .call-status, details.more summary { font-family: var(--sans); letter-spacing: -0.01em; text-transform: none; }
+.list > li { grid-template-columns: 1fr; }
+.list > li::before, .steps-list li::before { display: none; }
+.steps-list li { grid-template-columns: 1fr; }
+.list .s, details.ans summary .t { font: 13px var(--sans); }
+.prep .about { font: 400 18px/1.55 var(--sans); letter-spacing: -0.015em; }
+.join { border-top-color: var(--line); }
+.captions .them { font: 600 24px/1.25 var(--sans); letter-spacing: -0.03em; }
+.captions .you::before { font: 600 11px var(--sans); }
+.bigscore .num { font: 650 104px/0.9 var(--sans); letter-spacing: -0.06em; }
+.bigscore .of { font: 500 28px var(--sans); }
+.crit .ev, details.ans blockquote { font: 500 17px/1.45 var(--sans); font-style: normal; letter-spacing: -0.015em; }
+.kv b { font: 600 12px/1.9 var(--sans); letter-spacing: 0; text-transform: none; }
+.mono-face { font-family: var(--sans); font-weight: 600; }
+@media (min-width: 640px) {
+  .display { font-size: 60px; }
+  .display.md { font-size: 42px; }
 }
