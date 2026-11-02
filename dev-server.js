@@ -3,7 +3,7 @@ import http from "node:http";
 import { readFile } from "node:fs/promises";
 import { extname, join, normalize } from "node:path";
 
-const types = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml" };
+const types = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml", ".png": "image/png" };
 const port = process.env.PORT || 3000;
 
 http
@@ -18,7 +18,7 @@ http
         return res.end("Not found");
       }
     }
-    let path = url.pathname === "/" ? "/index.html" : url.pathname;
+    let path = url.pathname === "/" || /^\/i(\/|$)/.test(url.pathname) ? "/index.html" : url.pathname;
     if (!extname(path)) path += ".html";
     try {
       const body = await readFile(join("public", normalize(path).replace(/^(\.\.[/\\])+/, "")));

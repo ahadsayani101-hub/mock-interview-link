@@ -10,4 +10,4 @@ export default route(async ({ plan, index, exchanges }) => {
   const t = await nextTurn({ plan, index, exchanges: exchanges.slice(-4), canFollowUp, isLast });
   if (!canFollowUp) t.action = "next";
   return t;
-});
+}, { name: "turn", perHour: 400, perDay: 4000 });
