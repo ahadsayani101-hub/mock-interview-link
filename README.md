@@ -13,7 +13,10 @@ Built for the UGA Create Club challenge (Option E).
 https://aistudio.google.com/apikey, no card needed) the app researches the company, writes the
 questions and prep sheet, runs follow-ups, grades the interview, and gives the interviewer a
 natural voice. Claude (`ANTHROPIC_API_KEY`) is used instead when its key is set. Note that Google
-may use free-tier requests to improve its products.
+may use free-tier requests to improve its products. To stretch the free limits, building an
+interview takes one AI request (the research brief is written in the same call), the same job
+built again reuses its plan for 12 hours, follow-ups use the lighter models, and when a model's
+free quota runs out the next free model takes over.
 
 ## How it works
 
