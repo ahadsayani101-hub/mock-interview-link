@@ -1,6 +1,6 @@
-# Callback
+# Poise
 
-*Practice the interview. Get the callback.* (Repo name: Mock Interview Link.)
+*Practice out loud. Walk in ready.* (Repo name: Mock Interview Link.)
 
 Enter a company, position and job description, get a short link like
 `mock-interview-link.vercel.app/i/stripe-7kq2`. Anyone who opens it on a phone sees a prep sheet
@@ -29,11 +29,13 @@ free quota runs out the next free model takes over.
 | Interview (`/i`) | **Live mode** (needs `OPENAI_API_KEY`): `api/realtime` mints a short-lived key for an OpenAI Realtime session whose instructions hold the persona, the role, the research notes and the planned questions. The phone connects straight to OpenAI over WebRTC, so the conversation is hands-free with natural turn-taking. The model calls `set_question` as it moves through the plan and `end_interview` after saying goodbye; the page keeps a transcript from the live captions. **Classic mode** (fallback): the question is read aloud (`api/speak` with OpenAI, ElevenLabs or Gemini text-to-speech, or the browser voice), the candidate taps to answer, and `api/turn` decides on one follow-up. Answers are heard with the browser's speech recognition; where there is none (an iPhone app on the home screen, Firefox) the page records the answer as a small WAV file and `api/listen` has Gemini write it down. Typing is always available. |
 | Scorecard | `api/finish` grades against the **baseline rubric** (`lib/rubric.js`: communication, specific examples, ownership and impact, motivation and fit, self-awareness) and the **role rubric**, each criterion 1-5 with a word-for-word quote. Overall score out of 10 weighs the role rubric 60% and the baseline 40%. Also gives per-answer feedback, then emails the scorecard and shows it on screen. |
 
-**An app, for free.** Callback is a Progressive Web App, so there's no App Store fee: it has a
+**An app, for free.** Poise is a Progressive Web App, so there's no App Store fee: it has a
 web app manifest (`public/manifest.webmanifest`), icons, and a service worker (`public/sw.js`)
 that always loads fresh pages and only uses its saved copy offline (the API is never cached).
 "Get the app" in the top bar (`public/install.js`) uses the browser's install prompt on Android
-and desktop Chrome/Edge, and shows "Share, then Add to Home Screen" steps on iPhone. Interviews
+and desktop Chrome/Edge, and shows "Share, then Add to Home Screen" steps on iPhone. A short opening animation (the
+logo pops in with two voice ripples, then the name) plays once per visit, or on each app launch;
+tap to skip. Interviews
 you build or take are listed under "Your interviews" with your last score, saved only on that
 device. It also works in any phone browser with no install. Light and dark themes (toggle in
 the top corner). Interviewer photos are stock images from Unsplash.

@@ -1,7 +1,7 @@
-// Makes Callback installable and quick to open. Pages and files always come fresh from the
+// Makes Poise installable and quick to open. Pages and files always come fresh from the
 // network when there is one (so updates show up right away); the saved copy is only used
 // offline. The API is never cached.
-const CACHE = "callback-v1";
+const CACHE = "poise-v1";
 const SHELL = ["/", "/style.css", "/app.js", "/ui.js", "/interview.js", "/install.js", "/vendor/qrcode.js", "/manifest.webmanifest", "/icon-192.png", "/favicon.png"];
 
 self.addEventListener("install", (e) => {
