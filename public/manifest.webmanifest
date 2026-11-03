@@ -1,13 +1,13 @@
 {
   "id": "/",
-  "name": "Callback: mock interviews out loud",
-  "short_name": "Callback",
+  "name": "Poise: mock interviews out loud",
+  "short_name": "Poise",
   "description": "Paste a job posting and practice the interview out loud. Real questions, follow-ups and a scorecard that quotes your answers. Free.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#121212",
-  "theme_color": "#121212",
+  "background_color": "#151311",
+  "theme_color": "#151311",
   "categories": ["education", "productivity", "business"],
   "icons": [
     { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },

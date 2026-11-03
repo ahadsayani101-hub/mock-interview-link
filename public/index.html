@@ -3,20 +3,20 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Callback: practice interviews out loud</title>
-  <meta name="description" content="Practice the interview, get the callback. A free app that builds a spoken mock interview from any job posting and grades you with your own words." />
-  <meta name="theme-color" content="#121212" />
+  <title>Poise: practice interviews out loud</title>
+  <meta name="description" content="Practice out loud. Walk in ready. A free app that builds a spoken mock interview from any job posting and grades you with your own words." />
+  <meta name="theme-color" content="#151311" />
   <link rel="manifest" href="/manifest.webmanifest" />
   <link rel="icon" type="image/png" href="/favicon.png" />
   <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-title" content="Callback" />
+  <meta name="apple-mobile-web-app-title" content="Poise" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="application-name" content="Callback" />
+  <meta name="application-name" content="Poise" />
   <meta property="og:type" content="website" />
-  <meta property="og:site_name" content="Callback" />
-  <meta property="og:title" content="Callback: practice the interview, get the callback" />
+  <meta property="og:site_name" content="Poise" />
+  <meta property="og:title" content="Poise: practice out loud, walk in ready" />
   <meta property="og:description" content="Paste a job. Get a link. Answer out loud to an interviewer who follows up, then get a scorecard. Free." />
   <meta property="og:image" content="https://mock-interview-link.vercel.app/og.png" />
   <meta property="og:image:width" content="1200" />
@@ -29,10 +29,19 @@
   <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
+<!-- Opening animation, once per visit (every launch of the installed app). Tap to skip. -->
+<div class="intro" id="intro" aria-hidden="true">
+  <div class="intro-in">
+    <div class="intro-mark"><i></i><i></i><span class="mark"></span></div>
+    <div class="intro-word"><span>P</span><span>o</span><span>i</span><span>s</span><span>e</span></div>
+    <p class="intro-tag">Walk in ready.</p>
+  </div>
+</div>
+<script>(function(){var el=document.getElementById("intro"),d=document.documentElement,seen;try{seen=sessionStorage.getItem("intro");sessionStorage.setItem("intro","1")}catch(e){}if(seen){el.remove();return}d.dataset.intro="";var done=function(){el.classList.add("out");setTimeout(function(){el.remove();delete d.dataset.intro},500)},t=setTimeout(done,matchMedia("(prefers-reduced-motion: reduce)").matches?600:1700);el.onclick=function(){clearTimeout(t);done()}})()</script>
 <!-- One page, four steps: build → lobby (share + prep + join) → call → scorecard -->
 <main class="page">
   <header class="bar">
-    <a class="logo" href="/"><span class="mark"></span>Callback</a>
+    <a class="logo" href="/"><span class="mark"></span>Poise</a>
     <span class="clock" id="clock"></span>
     <button class="get-app" type="button" data-install hidden>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>
@@ -53,7 +62,7 @@
       <div class="hero-shade"></div>
       <span class="tag hero-tag"><span class="dot"></span><span id="hero-who">Your interviewer is ready</span></span>
       <div class="hero-copy">
-        <h1 class="display">Practice the interview. Get the callback<b class="stop">.</b></h1>
+        <h1 class="display">Practice out loud. Walk in ready<b class="stop">.</b></h1>
         <p class="sub">Paste any job posting and get a link. An interviewer asks real questions out loud, follows up when you're vague, and grades you with your own words.</p>
         <div class="hero-row">
           <a class="btn" href="#build"><span>Build my interview</span><span class="arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></a>
@@ -155,7 +164,7 @@
           </ul>
         </div>
         <div class="col ours">
-          <h3><span class="mark"></span>Callback</h3>
+          <h3><span class="mark"></span>Poise</h3>
           <ul>
             <li>Questions built from your posting and the company's research</li>
             <li>Follow-up questions when you stay vague</li>
@@ -174,8 +183,8 @@
 
     <footer class="foot">
       <div>
-        <a class="logo" href="/"><span class="mark"></span>Callback</a>
-        <p>Practice the interview. Get the callback. Built for UGA Create Club.</p>
+        <a class="logo" href="/"><span class="mark"></span>Poise</a>
+        <p>Practice out loud. Walk in ready. Built for UGA Create Club.</p>
       </div>
       <nav><a href="#build">Build an interview</a><a href="#how">How it works</a><a href="#" data-install hidden>Get the app</a></nav>
       <p class="small">We don't save recordings or transcripts. Answers go to an AI service (Google, Anthropic or OpenAI) only to run and grade the interview.</p>
@@ -311,7 +320,7 @@
   <div class="install-head">
     <img src="/icon-192.png" alt="" width="60" height="60" />
     <div>
-      <h2 id="install-title">Get the Callback app</h2>
+      <h2 id="install-title">Get the Poise app</h2>
       <p>Free, no App Store. It opens full screen from your home screen, like any app.</p>
     </div>
   </div>

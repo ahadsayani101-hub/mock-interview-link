@@ -10,7 +10,7 @@ export function initTheme() {
   const apply = (dark) => {
     if (dark) root.dataset.dark = "";
     else delete root.dataset.dark;
-    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", dark ? "#121212" : "#f5f5f1");
+    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", dark ? "#151311" : "#faf5ef");
     buttons.forEach((b) => b.setAttribute("aria-pressed", String(dark)));
   };
   apply("dark" in root.dataset);
@@ -83,12 +83,12 @@ export function el(tag, cls, text) {
 }
 
 // ---------- Your interviews (kept on this device only) ----------
-const SAVED = "callback:interviews";
+const SAVED = "poise:interviews";
 export const here = () => location.pathname + location.search + location.hash;
 
 export function savedInterviews() {
   try {
-    const list = JSON.parse(localStorage.getItem(SAVED));
+    const list = JSON.parse(localStorage.getItem(SAVED) ?? localStorage.getItem("callback:interviews")); // its name before the rename
     return Array.isArray(list) ? list : [];
   } catch {
     return [];

@@ -1,4 +1,4 @@
-// Callback as an app: registers the service worker and runs the "Get the app" button.
+// Poise as an app: registers the service worker and runs the "Get the app" button.
 // Android and desktop Chrome/Edge show their own install prompt; on iPhone the button opens
 // short "Add to Home Screen" steps, since Safari has no install prompt.
 
@@ -19,14 +19,14 @@ function steps() {
     return [
       `Tap the Share button <i>${SHARE}</i> ${safari ? "at the bottom of Safari (on iPad it's at the top)." : "next to the address bar."}`,
       `Scroll down and tap <b>Add to Home Screen</b> <i>${ADD}</i>`,
-      "Tap <b>Add</b>. Callback is now on your home screen.",
+      "Tap <b>Add</b>. Poise is now on your home screen.",
     ];
   }
   if (android) {
     return [
       `Tap the menu <i>${DOTS}</i> at the top right of your browser.`,
       "Tap <b>Install app</b> or <b>Add to Home screen</b>.",
-      "Tap <b>Install</b>. Callback is now with your other apps.",
+      "Tap <b>Install</b>. Poise is now with your other apps.",
     ];
   }
   if (macSafari) return ["In the menu bar, click <b>File</b>.", "Click <b>Add to Dock</b>, then <b>Add</b>."];

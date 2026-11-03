@@ -17,7 +17,7 @@ export default route(async ({ plan, turns, name, email }) => {
   let mail = { sent: false, reason: "No email address given." };
   if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     try {
-      mail = await sendScorecard({ to: email, subject: `Your Callback scorecard: ${plan.role} at ${plan.company}`, html });
+      mail = await sendScorecard({ to: email, subject: `Your Poise scorecard: ${plan.role} at ${plan.company}`, html });
     } catch (err) {
       console.error(err);
       mail = { sent: false, reason: err.message };
