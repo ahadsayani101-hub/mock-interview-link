@@ -81,3 +81,26 @@ export function el(tag, cls, text) {
   if (text != null) n.textContent = text;
   return n;
 }
+
+// ---------- Your interviews (kept on this device only) ----------
+const SAVED = "callback:interviews";
+export const here = () => location.pathname + location.search + location.hash;
+
+export function savedInterviews() {
+  try {
+    const list = JSON.parse(localStorage.getItem(SAVED));
+    return Array.isArray(list) ? list : [];
+  } catch {
+    return [];
+  }
+}
+
+// Adds or updates one interview ({ path, company, role, mine, score }), newest first.
+export function saveInterview(entry) {
+  try {
+    const list = savedInterviews();
+    const old = list.find((x) => x.path === entry.path) || {};
+    const next = [{ at: Date.now(), ...old, ...entry }, ...list.filter((x) => x.path !== entry.path)].slice(0, 20);
+    localStorage.setItem(SAVED, JSON.stringify(next));
+  } catch {}
+}

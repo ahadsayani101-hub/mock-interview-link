@@ -52,7 +52,10 @@ b, strong { font-weight: 600; }
 /* ---------- Top bar ---------- */
 .bar { display: flex; align-items: center; gap: 16px; padding: max(16px, env(safe-area-inset-top)) 0 16px; }
 .logo { display: inline-flex; align-items: center; gap: 10px; font: 650 18px/1 var(--sans); letter-spacing: -0.03em; text-decoration: none; }
-.mark { display: inline-block; width: 14px; height: 14px; border-radius: 3px; background: var(--accent); flex: none; }
+/* The app icon in miniature: a phone with a call coming back in */
+.mark { display: inline-block; width: 24px; height: 24px; border-radius: 7px; background: var(--accent) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23121212' d='M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z'/%3E%3Cpath d='M15.5 2.5v6h6M22 2l-6.5 6.5' fill='none' stroke='%23121212' stroke-width='2.3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") 55% 55% / 58% no-repeat; flex: none; }
+.get-app { flex: none; display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px 0 10px; border: 0; border-radius: 999px; background: var(--accent); color: var(--on-accent); font: 600 13px var(--sans); letter-spacing: -0.01em; white-space: nowrap; cursor: pointer; }
+.get-app svg { width: 15px; height: 15px; }
 .clock { margin-left: auto; font: 500 13px var(--sans); color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .theme { position: relative; flex: none; width: 52px; height: 30px; border-radius: 999px; border: 1px solid var(--line); background: var(--paper); cursor: pointer; padding: 0; }
 .theme .knob { position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: var(--ink); display: grid; place-items: center; color: var(--bg); transition: transform .3s cubic-bezier(.3,.7,.2,1); }
@@ -305,18 +308,51 @@ details.ans blockquote { margin: 0 0 12px; padding-left: 14px; border-left: 3px 
 .steps-list li { counter-increment: s; display: grid; grid-template-columns: 36px 1fr; padding: 14px 0; border-bottom: 1px solid var(--line); font-size: 16px; }
 .steps-list li::before { content: counter(s, decimal-leading-zero); font: 600 13px/1.75 var(--sans); color: var(--hl); font-variant-numeric: tabular-nums; }
 
+/* ---------- Your interviews ---------- */
+.saved { display: grid; gap: 8px; }
+.saved-row { display: flex; align-items: center; gap: 14px; padding: 14px 14px 14px 18px; border-radius: 16px; background: var(--paper); border: 1px solid var(--line); text-decoration: none; transition: border-color .15s; }
+.saved-row:hover { border-color: var(--accent); }
+.saved-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.saved-main b { font-size: 16px; letter-spacing: -0.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.saved-main span { font-size: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.saved-score { flex: none; font: 600 22px/1 var(--sans); letter-spacing: -0.04em; font-variant-numeric: tabular-nums; }
+.saved-score small { font-size: 13px; font-weight: 500; letter-spacing: -0.01em; color: var(--muted); }
+.saved-go { flex: none; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; background: var(--accent); color: var(--on-accent); }
+.saved-go svg { width: 16px; height: 16px; }
+
+/* ---------- Get the app (steps for browsers without an install prompt) ---------- */
+.install { width: min(440px, calc(100% - 24px)); max-width: none; margin: auto auto max(12px, env(safe-area-inset-bottom)); padding: 22px; border: 1px solid var(--line); border-radius: 22px; background: var(--paper); color: var(--ink); box-shadow: 0 24px 60px rgba(0,0,0,.35); }
+.install[open] { animation: rise .3s cubic-bezier(.2,.8,.2,1); }
+.install::backdrop { background: rgba(0,0,0,.55); }
+@keyframes rise { from { opacity: 0; transform: translateY(24px); } }
+.install-head { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; }
+.install-head img { flex: none; border-radius: 14px; }
+.install-head h2 { font: 600 20px/1.2 var(--sans); letter-spacing: -0.03em; margin: 0 0 4px; }
+.install-head p { margin: 0; font-size: 14px; line-height: 1.45; color: var(--ink-2); }
+.install-steps { list-style: none; counter-reset: step; margin: 0 0 20px; padding: 0; }
+.install-steps li { counter-increment: step; display: flex; align-items: flex-start; gap: 12px; padding: 13px 0; border-top: 1px solid var(--line); font-size: 15px; line-height: 1.5; }
+.install-steps li::before { content: counter(step); flex: none; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--accent); color: var(--on-accent); font: 600 13px/1 var(--sans); }
+.install-steps i { display: inline-grid; place-items: center; width: 26px; height: 26px; margin: -3px 2px; vertical-align: middle; border-radius: 7px; background: var(--raise); color: var(--ink); }
+.install-steps svg { width: 17px; height: 17px; }
+
 .fade { animation: fade .5s cubic-bezier(.2,.7,.2,1) both; }
 @keyframes fade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 
 /* ---------- Larger screens ---------- */
 @media (max-width: 360px) { .clock { display: none; } .theme { margin-left: auto; } }
+/* Phones: make room for "Get the app" by hiding the clock */
+@media (max-width: 540px) {
+  .bar:has(.get-app:not([hidden])) .clock { display: none; }
+  .bar:has(.get-app:not([hidden])) .get-app { margin-left: auto; }
+}
 /* Phones: the photo sits on top and fades into the headline, so the copy never covers a face */
 @media (max-width: 639px) {
   .hero { min-height: 0; justify-content: flex-start; }
-  .hero-photo { position: relative; inset: auto; aspect-ratio: 1 / 1; -webkit-mask-image: linear-gradient(to bottom, #000 60%, transparent); mask-image: linear-gradient(to bottom, #000 60%, transparent); }
+  .hero-photo { position: relative; inset: auto; aspect-ratio: 1 / 1; overflow: hidden; -webkit-mask-image: linear-gradient(to bottom, #000 60%, transparent); mask-image: linear-gradient(to bottom, #000 60%, transparent); }
   .hero-shade { display: none; }
   .hero-copy { margin-top: -72px; }
   .display { font-size: 40px; }
+  :root[data-app] .hero-photo { aspect-ratio: 4 / 3; }
 }
 @media (min-width: 640px) {
   .page { padding-left: 32px; padding-right: 32px; }
@@ -343,6 +379,8 @@ details.ans blockquote { margin: 0 0 12px; padding-left: 14px; border-left: 3px 
 @media (min-width: 1000px) {
   .display { font-size: 76px; }
   .hero { min-height: 640px; }
+  :root[data-app] .hero { min-height: 520px; }
+  .saved { grid-template-columns: 1fr 1fr; }
   .hero-shade { background: linear-gradient(to top, rgba(14,14,14,.92) 8%, rgba(14,14,14,.35) 45%, rgba(14,14,14,0) 70%), linear-gradient(to right, rgba(14,14,14,.85) 0%, rgba(14,14,14,.45) 45%, transparent 70%); }
   .hero-photo .face { object-position: 70% 25%; }
   .cards { grid-template-columns: repeat(4, 1fr); }
