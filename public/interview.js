@@ -1,5 +1,6 @@
 // The lobby, the call and the scorecard. app.js opens the lobby after building, or from a shared link.
-import { interviewerFor, face, decodePlan, post, el, show } from "/ui.js";
+import { interviewerFor, face, decodePlan, post, el, show, here, saveInterview, savedInterviews } from "/ui.js";
+import { iOS, isApp } from "/install.js";
 
 const $ = (id) => document.getElementById(id);
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -216,15 +217,20 @@ function fetchAudio(text) {
   return audioCache.get(text);
 }
 
-// iOS only lets a page play audio after a tap; play a blank clip inside the Join tap.
-function unlockAudio() {
-  const rate = 8000, n = 800;
-  const buf = new DataView(new ArrayBuffer(44 + n * 2));
+// The 44-byte header of a mono 16-bit WAV file with n samples.
+function wavHeader(buf, rate, n) {
   const str = (o, s) => [...s].forEach((c, i) => buf.setUint8(o + i, c.charCodeAt(0)));
   str(0, "RIFF"); buf.setUint32(4, 36 + n * 2, true); str(8, "WAVEfmt ");
   buf.setUint32(16, 16, true); buf.setUint16(20, 1, true); buf.setUint16(22, 1, true);
   buf.setUint32(24, rate, true); buf.setUint32(28, rate * 2, true); buf.setUint16(32, 2, true);
   buf.setUint16(34, 16, true); str(36, "data"); buf.setUint32(40, n * 2, true);
+}
+
+// iOS only lets a page play audio after a tap; play a blank clip inside the Join tap.
+function unlockAudio() {
+  const rate = 8000, n = 800;
+  const buf = new DataView(new ArrayBuffer(44 + n * 2));
+  wavHeader(buf, rate, n);
   player.src = URL.createObjectURL(new Blob([buf], { type: "audio/wav" }));
   player.play().catch(() => {});
   if ("speechSynthesis" in window) speechSynthesis.speak(new SpeechSynthesisUtterance(""));
@@ -285,12 +291,23 @@ async function say(text) {
 }
 
 const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-let typing = !Recognition;
+// An iPhone app on the home screen has no speech recognition (Safari itself does), and neither
+// does Firefox. There the answer is recorded and the server writes it down instead.
+let speech = Recognition && !(iOS && isApp()) ? Recognition : null;
+let canRecord = Boolean(navigator.mediaDevices?.getUserMedia && (window.AudioContext || window.webkitAudioContext));
+let typing = !speech && !canRecord;
 let rec, recording = false, committed = "", live = "";
 let answerResolve, current;
 
+function micBlocked() {
+  recording = false;
+  resetTalk();
+  setTyping(true);
+  status("Microphone is blocked, so type your answer");
+}
+
 function listen() {
-  rec = new Recognition();
+  rec = new speech();
   rec.lang = "en-US";
   rec.continuous = true;
   rec.interimResults = true;
@@ -299,22 +316,84 @@ function listen() {
     captionYou((committed + " " + live).trim());
   };
   rec.onerror = (e) => {
-    if (e.error === "not-allowed" || e.error === "service-not-allowed") {
-      recording = false;
-      resetTalk();
-      setTyping(true);
-      status("Microphone is blocked, so type your answer");
-    }
+    if (e.error === "service-not-allowed" && canRecord && recording) {
+      // Speech recognition is switched off here: record the answer instead.
+      speech = null;
+      startCapture().catch(micBlocked);
+    } else if (e.error === "not-allowed" || e.error === "service-not-allowed") micBlocked();
   };
   // Mobile browsers stop listening after a pause; keep going until the user taps done.
   rec.onend = () => {
     committed = (committed + " " + live).trim();
     live = "";
-    if (recording) {
+    if (recording && speech) {
       try { listen(); } catch {}
     }
   };
   rec.start();
+}
+
+// ---------- Recording an answer (when there's no speech recognition) ----------
+const MAX_ANSWER_S = 120; // keeps the upload under Vercel's 4.5 MB limit
+let cap;
+
+async function startCapture() {
+  audioCtx ||= new (window.AudioContext || window.webkitAudioContext)();
+  audioCtx.resume().catch(() => {});
+  status("Starting your mic");
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+  if (!recording || ended) return stream.getTracks().forEach((t) => t.stop());
+  await audioCtx.resume().catch(() => {});
+  const src = audioCtx.createMediaStreamSource(stream);
+  const node = audioCtx.createScriptProcessor(4096, 1, 1);
+  const chunks = [];
+  node.onaudioprocess = (e) => chunks.push(new Float32Array(e.inputBuffer.getChannelData(0)));
+  src.connect(node);
+  node.connect(audioCtx.destination); // silent; some browsers only record when connected
+  const t0 = Date.now();
+  const tick = () => {
+    const s = Math.floor((Date.now() - t0) / 1000);
+    status(`Listening ${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}. Tap when you're done`);
+    if (s >= MAX_ANSWER_S) finishAnswer();
+  };
+  cap = { stream, src, node, chunks, timer: setInterval(tick, 500) };
+  tick();
+}
+
+// Stops recording and returns the answer as a 16 kHz WAV file, or null if it was silent.
+function stopCapture() {
+  if (!cap) return null;
+  const { stream, src, node, chunks, timer } = cap;
+  cap = null;
+  clearInterval(timer);
+  try { src.disconnect(); node.disconnect(); } catch {}
+  stream.getTracks().forEach((t) => t.stop());
+  const from = audioCtx.sampleRate, to = Math.min(16000, from), ratio = from / to;
+  const total = chunks.reduce((n, c) => n + c.length, 0);
+  const flat = new Float32Array(total);
+  let o = 0, energy = 0;
+  for (const c of chunks) { flat.set(c, o); o += c.length; }
+  const n = Math.floor(total / ratio);
+  const view = new DataView(new ArrayBuffer(44 + n * 2));
+  wavHeader(view, to, n);
+  for (let i = 0; i < n; i++) {
+    const a = Math.floor(i * ratio), b = Math.max(a + 1, Math.floor((i + 1) * ratio));
+    let sum = 0;
+    for (let k = a; k < b && k < total; k++) sum += flat[k];
+    const v = Math.max(-1, Math.min(1, sum / (b - a)));
+    energy += v * v;
+    view.setInt16(44 + i * 2, v < 0 ? v * 0x8000 : v * 0x7fff, true);
+  }
+  if (n < to / 2 || Math.sqrt(energy / n) < 0.0015) return null; // under half a second, or silence
+  return new Blob([view], { type: "audio/wav" });
+}
+
+async function transcribe(wav) {
+  if (!wav) return "";
+  const r = await fetch("/api/listen", { method: "POST", headers: { "Content-Type": "audio/wav" }, body: wav });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw Object.assign(new Error(data.error || "Couldn't write down that answer"), { status: r.status });
+  return String(data.text || "").trim();
 }
 
 function resetTalk() {
@@ -323,6 +402,11 @@ function resetTalk() {
 }
 
 function stopRecording() {
+  if (!speech) {
+    recording = false;
+    resetTalk();
+    return transcribe(stopCapture());
+  }
   return new Promise((resolve) => {
     recording = false;
     resetTalk();
@@ -342,7 +426,7 @@ function setTyping(on) {
   typing = on;
   $("typed").hidden = !on;
   $("talk").innerHTML = on ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>' : ICON.mic;
-  $("type").hidden = !Recognition;
+  $("type").hidden = !(speech || canRecord);
   if (on) setTimeout(() => $("typed").focus(), 50);
 }
 
@@ -428,18 +512,48 @@ $("talk").onclick = async () => {
     $("talk").innerHTML = ICON.stop;
     status("Listening. Tap when you're done");
     try {
-      listen();
+      if (speech) listen();
+      else await startCapture();
     } catch {
-      setTyping(true);
+      micBlocked();
     }
     return;
   }
-  lock(true);
-  status(`${person.name} is thinking`);
-  answerResolve?.(await stopRecording());
+  finishAnswer();
 };
+
+let finishing = false;
+async function finishAnswer() {
+  if (finishing || !recording) return;
+  finishing = true;
+  lock(true);
+  status(speech ? `${person.name} is thinking` : "Writing down your answer");
+  let said;
+  try {
+    said = await stopRecording();
+  } catch (err) {
+    // The free transcription is out of quota or unavailable: type for the rest of the call.
+    if (err.status === 429 || err.status === 501) canRecord = false;
+    finishing = false;
+    if (ended) return;
+    lock(false);
+    setTyping(true);
+    status("I couldn't catch that, so please type your answer");
+    return;
+  }
+  finishing = false;
+  if (ended) return;
+  if (!said) {
+    lock(false);
+    status("I didn't catch that. Tap the mic and try again");
+    return;
+  }
+  captionYou(said);
+  status(`${person.name} is thinking`);
+  answerResolve?.(said);
+}
 $("type").onclick = async () => {
-  if (recording) $("typed").value = await stopRecording();
+  if (recording) $("typed").value = await stopRecording().catch(() => "");
   setTyping(!typing);
   if (!$("talk").disabled) status(typing ? "Type your answer, then tap the arrow" : "Tap the mic to answer");
 };
@@ -484,7 +598,9 @@ function hangUp() {
   media?.getTracks().forEach((t) => t.stop());
   speechSynthesis?.cancel();
   player.pause();
-  if (recording) stopRecording();
+  if (recording && speech) stopRecording();
+  recording = false;
+  stopCapture();
   answerResolve?.("");
   finish();
 }
@@ -594,6 +710,7 @@ function renderResults(card, mail, baseline) {
   $("d-headline").textContent = card.headline;
   $("d-summary").textContent = card.summary;
   const email = $("email").value.trim();
+  saveInterview({ path: here(), company: plan.company, role: plan.role, score: card.overall, scoredAt: Date.now() });
   $("d-mail").textContent = mail.sent
     ? `A copy is on its way to ${email}.`
     : `Not emailed: ${String(mail.reason || "").replace(/\.$/, "")}. Screenshot this page to keep it.`;
@@ -752,10 +869,13 @@ export function openLobby(p, { baseline, creator = false } = {}) {
   $("share-box").hidden = true;
   renderPrep(baseline, creator);
   $("start").disabled = false;
+  saveInterview({ path: here(), company: plan.company, role: plan.role, ...(creator ? { mine: true } : {}) });
   show("welcome");
   window.scrollTo(0, 0);
 }
 
+// Opens the interview in the address bar. Returns its plan if you built it on this device
+// (so the page can show its share link again), otherwise nothing.
 export async function loadFromLink() {
   show("welcome");
   let p, baseline;
@@ -776,5 +896,8 @@ export async function loadFromLink() {
     $("portrait").hidden = true;
     return;
   }
-  openLobby(p, { baseline });
+  // Interviews you built on this device keep the creator's view (sources, notes, questions).
+  const mine = savedInterviews().find((x) => x.path === here())?.mine;
+  openLobby(p, { baseline, creator: Boolean(mine) });
+  return mine ? p : null;
 }

@@ -1,15 +1,23 @@
 // Entry point for the one-page app: build an interview, share it, then hand off to the lobby.
-import { initTheme, initClock, INTERVIEWERS, face, encodePlan, post, el, show } from "/ui.js";
+import { initTheme, initClock, INTERVIEWERS, face, encodePlan, post, el, show, savedInterviews } from "/ui.js";
 import { openLobby, loadFromLink } from "/interview.js";
+import { initInstall } from "/install.js";
 import qrcode from "/vendor/qrcode.js";
 
 const $ = (id) => document.getElementById(id);
 initTheme();
 initClock();
+initInstall();
 
 // A shared link (/i/<id>, /i#<plan> or ?id=) opens straight into the lobby.
-if (/^\/i(\/|$)/.test(location.pathname) || new URLSearchParams(location.search).has("id")) loadFromLink();
-else show("create");
+if (/^\/i(\/|$)/.test(location.pathname) || new URLSearchParams(location.search).has("id")) {
+  loadFromLink().then((plan) => {
+    if (plan) renderShare(plan, location.pathname.match(/^\/i\/([a-z0-9-]+)/)?.[1], location.href);
+  });
+} else {
+  show("create");
+  renderSaved();
+}
 // Back/forward moves between the build form and an interview's link, so reload that step.
 addEventListener("popstate", () => location.reload());
 
@@ -134,5 +142,26 @@ function renderShare(plan, id, url) {
   $("short").onclick = copy;
   $("share").textContent = navigator.share ? "Share link" : "Copy link";
   $("share").onclick = () =>
-    navigator.share ? navigator.share({ title: `Mock interview: ${plan.role} at ${plan.company}`, url }).catch(() => {}) : copy();
+    navigator.share ? navigator.share({ title: `Practice interview: ${plan.role} at ${plan.company}`, url }).catch(() => {}) : copy();
+}
+
+// Interviews built or taken on this device, newest first, with the last score.
+function renderSaved() {
+  const list = savedInterviews().slice(0, 6);
+  $("saved").hidden = !list.length;
+  const day = (t) => new Date(t).toLocaleDateString([], { month: "short", day: "numeric" });
+  $("saved-list").replaceChildren(
+    ...list.map((x) => {
+      const a = el("a", "saved-row");
+      a.href = x.path;
+      const main = el("span", "saved-main");
+      main.append(el("b", null, x.role || "Interview"), el("span", null, [x.company, day(x.scoredAt || x.at)].filter(Boolean).join(" · ")));
+      const score = el("span", "saved-score");
+      if (x.score != null) score.append(String(x.score), el("small", null, "/10"));
+      else score.append(el("small", null, "Not taken yet"));
+      a.append(main, score, el("span", "saved-go"));
+      a.lastChild.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
+      return a;
+    })
+  );
 }
